@@ -4,6 +4,7 @@ export { backgroundUnder, elementCenter };
 import { contrastRatio, hexToRgb } from "@/lib/color";
 import { backgroundUnder, elementCenter } from "@/lib/scene-geometry";
 import { minNetWeightHeight } from "@/lib/generator/generate";
+import { legalLabel, sectorDef } from "@/lib/sectors";
 
 export type CheckStatus = "ok" | "warn" | "fail";
 
@@ -28,21 +29,11 @@ export const SHELF_DISTANCE_MM = 2000;
 /** Règle d'usage en signalétique : 1 mm de hauteur de capitale pour 250 mm de distance de lecture. */
 export const LEGIBILITY_FACTOR = 250;
 
-const LEGAL_LABELS: Record<LegalKey, string> = {
-  denomination: "Dénomination légale",
-  netWeight: "Poids net",
-  ingredients: "Liste des ingrédients",
-  allergens: "Allergènes",
-  nutrition: "Tableau nutritionnel",
-  storage: "Conditions de conservation",
-  bestBefore: "DDM / DLC et n° de lot",
-  address: "Nom et adresse de l'exploitant",
-  origin: "Origine",
-  recycling: "Info-tri (Triman)",
-  barcode: "Code-barres EAN",
-};
+export function readingDistance(dieline: Dieline): number {
+  const front = dieline.panels.find((p) => p.role === "front");
+  return front && Math.max(front.w, front.h) < 120 ? 1000 : SHELF_DISTANCE_MM;
+}
 
-const REQUIRED: LegalKey[] = ["denomination", "netWeight", "ingredients", "allergens", "nutrition", "storage", "bestBefore", "address", "barcode"];
 
 function panelOf(el: DesignElement, dieline: Dieline): Panel | undefined {
   if (el.panelId) return dieline.panels.find((p) => p.id === el.panelId);
@@ -63,16 +54,18 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
   // 1. Lisibilité à 2 m
   const names = frontTexts.filter((t) => t.role === "productName");
   const name = names.sort((a, b) => b.fontSize - a.fontSize)[0];
-  const required = SHELF_DISTANCE_MM / LEGIBILITY_FACTOR;
+  // Distance de lecture : 2 m pour un étui ou un sachet en rayon, 1 m pour un petit format (pot, flacon, tube)
+  const distance = readingDistance(dieline);
+  const required = distance / LEGIBILITY_FACTOR;
   if (!name) {
-    items.push({ id: "readability", label: "Lisibilité du nom produit à 2 m", status: "fail", detail: "Aucun nom de produit sur la face avant.", advice: "Ajoutez le nom du produit sur la face avant." });
+    items.push({ id: "readability", label: `Lisibilité du nom produit à ${distance / 1000} m`, status: "fail", detail: "Aucun nom de produit sur la face avant.", advice: "Ajoutez le nom du produit sur la face avant." });
   } else {
     const cap = name.fontSize * CAP_RATIO;
     items.push({
       id: "readability",
-      label: "Lisibilité du nom produit à 2 m",
+      label: `Lisibilité du nom produit à ${distance / 1000} m`,
       status: status(cap >= required, cap >= required * 0.65),
-      detail: `Hauteur de capitale ${fmt(cap)} mm (${fmt(name.fontSize / 0.3528)} pt) — minimum conseillé ${fmt(required)} mm pour une lecture à 2 m en rayon.`,
+      detail: `Hauteur de capitale ${fmt(cap)} mm (${fmt(name.fontSize / 0.3528)} pt) — minimum conseillé ${fmt(required)} mm pour une lecture à ${distance / 1000} m en rayon.`,
       advice: cap >= required ? undefined : "Agrandissez le nom du produit ou raccourcissez-le pour libérer de la place.",
       elementIds: [name.id],
     });
@@ -85,7 +78,9 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
   } else {
     const relTop = (logo.y - front.y) / front.h;
     const above = !name || logo.y <= name.y + 0.5;
-    const competing = frontTexts.filter((t) => t.role !== "productName" && t.role !== "logo" && name && t.fontSize > name.fontSize);
+    // Le poids net à sa hauteur légale minimale n'est pas compté : il ne peut pas être réduit.
+    const legalWeight = (t: TextElement) => t.role === "weight" && t.fontSize * CAP_RATIO <= minNetWeightHeight(brief.netWeight) * 1.1;
+    const competing = frontTexts.filter((t) => t.role !== "productName" && t.role !== "logo" && !legalWeight(t) && name && t.fontSize > name.fontSize);
     const ok = relTop <= 0.3 && above && !competing.length;
     items.push({
       id: "logo",
@@ -128,15 +123,18 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
     elementIds: contrastIssues.map((c) => c.el.id),
   });
 
-  // 4. Mentions réglementaires (INCO 1169/2011) et emplacement
+  // 4. Mentions réglementaires du secteur et emplacement
+  const sector = sectorDef(brief.sector);
+  const LABEL = (k: LegalKey) => legalLabel(sector, k);
   const legal = scene.elements.filter((e) => e.legalKey);
   const has = (k: LegalKey) => legal.some((e) => e.legalKey === k);
-  const missing = REQUIRED.filter((k) => !has(k));
+  const missing = sector.required.filter((k) => !has(k));
+  // Info-tri Triman : obligatoire en France pour tout emballage ménager (loi AGEC)
   if (brief.country.toLowerCase().includes("france") && !has("recycling")) missing.push("recycling");
   const fieldIssues: string[] = [];
-  for (const k of ["denomination", "netWeight"] as LegalKey[]) {
+  for (const k of sector.front) {
     const els = legal.filter((e) => e.legalKey === k);
-    if (els.length && front && !els.some(onFront)) fieldIssues.push(`${LEGAL_LABELS[k]} hors du champ visuel principal`);
+    if (els.length && front && !els.some(onFront)) fieldIssues.push(`${LABEL(k)} hors du champ visuel principal`);
   }
   const glue = dieline.panels.filter((p) => p.role === "glue").map((p) => p.id);
   const onGlue = legal.filter((e) => glue.includes(panelOf(e, dieline)?.id ?? ""));
@@ -148,7 +146,7 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
 
   const largest = Math.max(...dieline.panels.map((p) => p.w * p.h)) / 100;
   const minX = largest < 80 ? 0.9 : 1.2;
-  const small = texts.filter((t) => t.legalKey && t.legalKey !== "barcode" && t.fontSize * X_RATIO < minX - 1e-6);
+  const small = texts.filter((t) => t.legalKey && t.legalKey !== "barcode" && t.legalKey !== "braille" && t.fontSize * X_RATIO < minX - 1e-6);
   if (small.length) fieldIssues.push(`${small.length} mention(s) sous ${fmt(minX)} mm de hauteur d'œil`);
 
   items.push({
@@ -156,9 +154,11 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
     label: "Mentions réglementaires",
     status: missing.length > 2 ? "fail" : missing.length || fieldIssues.length ? "warn" : "ok",
     detail: missing.length || fieldIssues.length
-      ? [missing.length ? `Manquant : ${missing.map((k) => LEGAL_LABELS[k]).join(", ")}.` : "", fieldIssues.length ? `À corriger : ${fieldIssues.join(" ; ")}.` : ""].filter(Boolean).join(" ")
-      : "Dénomination et poids net dans le champ visuel principal ; ingrédients, allergènes, nutrition, conservation, DDM/lot, exploitant et EAN présents.",
-    advice: missing.length || fieldIssues.length ? "Référence : règlement (UE) n° 1169/2011, art. 9 et 13 ; loi AGEC pour l'info-tri." : undefined,
+      ? [missing.length ? `Manquant : ${missing.map(LABEL).join(", ")}.` : "", fieldIssues.length ? `À corriger : ${fieldIssues.join(" ; ")}.` : ""].filter(Boolean).join(" ")
+      : `${sector.front.map(LABEL).join(", ")} dans le champ visuel principal ; ${sector.required.filter((k) => !sector.front.includes(k)).map(LABEL).join(", ").toLowerCase()} présents.`,
+    advice: missing.length || fieldIssues.length
+      ? `${small.length && dieline.packType === "etiquette" ? "Surface insuffisante pour toutes les mentions : prévoyez une contre-étiquette ou une notice. " : ""}Référence : ${sector.regulation} ; loi AGEC pour l'info-tri.`
+      : undefined,
     elementIds: [...small.map((s) => s.id), ...onGlue.map((e) => e.id)],
   });
 
@@ -171,7 +171,10 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
     const horizontal = Math.abs(e.rotation % 180) < 1;
     const hw = (horizontal ? e.w : e.h) / 2, hh = (horizontal ? e.h : e.w) / 2;
     const s = dieline.safeMarginMm - 0.5;
-    return c.x - hw < p.x + s || c.x + hw > p.x + p.w - s || c.y - hh < p.y + s || c.y + hh > p.y + p.h - s;
+    // Une zone logique (étiquette, sachet) n'a ni pli ni découpe sur ses bords intérieurs.
+    const edge = (atBorder: boolean) => !p.virtual || atBorder;
+    return (edge(p.x < 0.5) && c.x - hw < p.x + s) || (edge(p.x + p.w > dieline.widthMm - 0.5) && c.x + hw > p.x + p.w - s)
+      || (edge(p.y < 0.5) && c.y - hh < p.y + s) || (edge(p.y + p.h > dieline.heightMm - 0.5) && c.y + hh > p.y + p.h - s);
   });
   items.push({
     id: "grid",
@@ -189,10 +192,11 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
   const area = front ? photos.reduce((s, p) => s + p.w * p.h, 0) / (front.w * front.h) : 0;
   items.push({
     id: "photo",
-    label: "Photo appétissante",
-    status: status(area >= 0.2, area >= 0.12),
+    label: sector.visualLabel,
+    // Petit format (pot, flacon) : le nom et les mentions légales prennent proportionnellement plus de place.
+    status: distance < SHELF_DISTANCE_MM ? status(area >= 0.1, area >= 0.05) : status(area >= 0.2, area >= 0.12),
     detail: photos.length ? `La photo produit occupe ${Math.round(area * 100)} % de la face avant.` : "Aucune photo produit sur la face avant.",
-    advice: area >= 0.2 ? undefined : "En rayon, la photo doit couvrir au moins 20 % de la face pour déclencher l'achat.",
+    advice: area >= (distance < SHELF_DISTANCE_MM ? 0.1 : 0.2) ? undefined : `En rayon, le visuel produit doit couvrir au moins ${distance < SHELF_DISTANCE_MM ? 10 : 20} % de la face pour déclencher l'achat.`,
   });
 
   const weights: Record<CheckStatus, number> = { ok: 1, warn: 0.6, fail: 0 };

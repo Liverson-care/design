@@ -38,7 +38,8 @@ export async function POST(req: Request) {
   }
   const count = Math.max(1, Math.min(5, body.count ?? 5, remaining));
 
-  const useAi = body.useAi !== false && aiEnabled();
+  // Avec un packshot fourni, c'est la photo réelle du produit qui sert de visuel : pas de génération d'image.
+  const useAi = body.useAi !== false && aiEnabled() && !brief.packshot;
   const heroImages = useAi
     ? await Promise.all(Array.from({ length: count }, (_, i) => generateProductPhoto(brief, variantPlan(brief, i).styleKey, i).catch(() => undefined)))
     : undefined;

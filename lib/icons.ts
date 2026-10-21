@@ -22,6 +22,11 @@ export const ICONS: IconDef[] = [
   { id: "horloge", label: "Prêt en 10 min", data: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2" },
   { id: "enfant", label: "Enfants", data: "M12 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 22l1-8-3-3 3-2h8l3 2-3 3 1 8" },
   { id: "muscle", label: "Riche en protéines", data: "M4 15c2-6 5-9 8-9l2 2-3 2c2 0 5 1 7 4 1 2 0 5-3 5H8c-3 0-5-2-4-4z" },
+  { id: "pao", label: "Période après ouverture", data: "M4 10h16l-1.5 10h-13zM4 10l3-5 8 1M9 14h6" },
+  { id: "clp", label: "Danger (CLP)", data: "M12 2l10 10-10 10L2 12zM12 7v6M12 16.5v.5" },
+  { id: "goutte", label: "Hydratation", data: "M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z" },
+  { id: "croix", label: "Pharmacie", data: "M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" },
+  { id: "patte", label: "Animaux", data: "M8 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 12c-3 0-5 4-5 6s2 3 5 3 5-1 5-3-2-6-5-6z" },
 ];
 
 export function icon(id: string): IconDef {

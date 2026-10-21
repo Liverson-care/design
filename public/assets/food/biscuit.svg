@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter><radialGradient id="b" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#f6cf8a"/><stop offset=".7" stop-color="#d9a051"/><stop offset="1" stop-color="#a86d2a"/></radialGradient></defs>
+<ellipse cx="200" cy="335" rx="160" ry="24" fill="#000" opacity=".18" filter="url(#blur)"/>
+<g><circle cx="150" cy="230" r="95" fill="url(#b)"/><circle cx="150" cy="230" r="80" fill="none" stroke="#b77b33" stroke-width="4" stroke-dasharray="3 9" opacity=".7"/>
+<circle cx="120" cy="200" r="4" fill="#a86d2a" opacity=".6"/>
+<circle cx="170" cy="190" r="4" fill="#a86d2a" opacity=".6"/>
+<circle cx="140" cy="250" r="4" fill="#a86d2a" opacity=".6"/>
+<circle cx="190" cy="240" r="4" fill="#a86d2a" opacity=".6"/>
+<circle cx="110" cy="260" r="4" fill="#a86d2a" opacity=".6"/>
+<circle cx="160" cy="290" r="4" fill="#a86d2a" opacity=".6"/></g>
+<g><circle cx="270" cy="200" r="80" fill="url(#b)"/><circle cx="245" cy="180" r="9" fill="#4a2b16"/>
+<circle cx="290" cy="175" r="7" fill="#4a2b16"/>
+<circle cx="265" cy="220" r="10" fill="#4a2b16"/>
+<circle cx="300" cy="225" r="6" fill="#4a2b16"/>
+<circle cx="240" cy="225" r="6" fill="#4a2b16"/></g>
+</svg>

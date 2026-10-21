@@ -1,5 +1,7 @@
 "use client";
 import type { CheckItem, GmsReport } from "@/lib/gms/check";
+import { useStudio } from "@/lib/store";
+import { sectorDef } from "@/lib/sectors";
 import { IconAlert, IconCheck, IconShield, IconX } from "@/components/ui/icons";
 
 const STATUS = {
@@ -45,15 +47,17 @@ export function CheckList({ items, onFocus }: { items: CheckItem[]; onFocus?: (i
   );
 }
 
-export function GmsPanel({ report, onFocus, title = "Contrôle Mode GMS France" }: { report?: GmsReport; onFocus?: (ids: string[]) => void; title?: string }) {
+export function GmsPanel({ report, onFocus, title }: { report?: GmsReport; onFocus?: (ids: string[]) => void; title?: string }) {
+  const sector = sectorDef(useStudio((s) => s.brief.sector));
   if (!report) return null;
+  const heading = title ?? (sector.food ? "Contrôle Mode GMS France" : sector.key === "medicament" ? "Contrôle officine & réglementaire" : "Contrôle rayon & réglementaire");
   return (
     <div className="card p-4">
       <div className="mb-3 flex items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-ink-900 text-white"><IconShield size={18} /></span>
         <div className="flex-1">
-          <h3 className="text-sm font-bold">{title}</h3>
-          <p className="text-[11px] text-ink-500">Lisibilité à 2 m · hiérarchie · contrastes · INCO</p>
+          <h3 className="text-sm font-bold">{heading}</h3>
+          <p className="text-[11px] text-ink-500">Lisibilité · hiérarchie · contrastes · {sector.regulation}</p>
         </div>
         <ScoreRing score={report.score} />
       </div>

@@ -10,7 +10,7 @@ import { DesignImage } from "@/components/canvas/DesignImage";
 const BoxPreview = dynamic(() => import("@/components/three/BoxPreview").then((m) => m.BoxPreview), { ssr: false });
 
 const DEMO: Brief = {
-  brandName: "Maison Dorée", productName: "Quiche Lorraine", category: "quiche", positioning: "familial", colors: ["#7a2e1d", "#f2c14e"],
+  sector: "alimentaire", brandName: "Maison Dorée", productName: "Quiche Lorraine", category: "quiche", positioning: "familial", colors: ["#7a2e1d", "#f2c14e"],
   style: "gourmet", audience: "familles", country: "France", inspirations: [], constraints: "", netWeight: "400 g", benefit: "", storage: "surgele", gmsReference: "marie",
 };
 

@@ -1,5 +1,5 @@
 import type { Brief, StyleKey } from "@/lib/types";
-import { CATEGORY_LABELS } from "@/lib/generator/copy";
+import { categoryDef, sectorDef } from "@/lib/sectors";
 
 export const aiEnabled = () => !!process.env.OPENAI_API_KEY;
 
@@ -12,6 +12,7 @@ const STYLE_PROMPT: Record<StyleKey, string> = {
   bio: "lumière naturelle, ingrédients frais du marché",
   luxe: "éclairage clair-obscur élégant",
   enfant: "couleurs joyeuses, présentation ludique",
+  sante: "lumière blanche clinique, fond neutre, rendu net et rassurant",
 };
 
 /**
@@ -22,10 +23,12 @@ export async function generateProductPhoto(brief: Brief, style: StyleKey, varian
   if (!aiEnabled()) return undefined;
   const angles = ["vue de trois-quarts", "vue de dessus", "gros plan serré", "vue légèrement plongeante", "présentation à l'assiette"];
   const prompt = [
-    `Photographie culinaire professionnelle, photoréaliste, de : ${brief.productName} (${CATEGORY_LABELS[brief.category]}).`,
+    sectorDef(brief.sector).food
+      ? `Photographie culinaire professionnelle, photoréaliste, de : ${brief.productName} (${categoryDef(brief.category).label}).`
+      : `Photographie packshot professionnelle, photoréaliste, illustrant : ${brief.productName} (${categoryDef(brief.category).label}) — ingrédients ou matières évocatrices, sans flacon ni boîte de marque.`,
     `${angles[variant % angles.length]}, ${STYLE_PROMPT[style]}.`,
     "Produit seul, détouré sur fond transparent, sans aucun texte, sans logo, sans emballage, sans main.",
-    "Qualité packshot pour emballage alimentaire de grande distribution.",
+    "Qualité packshot pour emballage de grande distribution.",
   ].join(" ");
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -52,7 +55,7 @@ export async function generateProductPhoto(brief: Brief, style: StyleKey, varian
 
 export async function generateLibraryPhoto(name: string): Promise<string | undefined> {
   return generateProductPhoto(
-    { brandName: "", productName: name, category: "plat-cuisine", positioning: "premium", colors: [], style: "gourmet", audience: "familles", country: "France", inspirations: [], constraints: "", netWeight: "", benefit: "", storage: "frais", gmsReference: "aucune" },
+    { sector: "alimentaire", brandName: "", productName: name, category: "plat-cuisine", positioning: "premium", colors: [], style: "gourmet", audience: "familles", country: "France", inspirations: [], constraints: "", netWeight: "", benefit: "", storage: "frais", gmsReference: "aucune" },
     "gourmet",
     0,
   );

@@ -5,7 +5,7 @@ import { TEMPLATES, buildTemplate } from "../lib/dieline/templates";
 import { parseSvgPath } from "../lib/dieline/svg-path";
 import { classifyStroke } from "../lib/dieline/classify";
 
-for (const spec of TEMPLATES) {
+for (const spec of TEMPLATES.filter((t) => t.kind === "tuck" || t.kind === "sleeve")) {
   test(`détection des panneaux — ${spec.label}`, () => {
     const d = analyzeDieline(buildTemplate(spec));
     const role = (r: string) => d.panels.filter((p) => p.role === r);
@@ -25,6 +25,33 @@ for (const spec of TEMPLATES) {
     }
   });
 }
+
+test("étiquette enveloppante : zones logiques face au centre, contenant cylindrique", () => {
+  const d = analyzeDieline(buildTemplate(TEMPLATES.find((t) => t.id === "etiquette-bocal")!));
+  assert.equal(d.packType, "etiquette");
+  assert.equal(d.labelMode, "enveloppante");
+  assert.deepEqual(d.panels.map((p) => p.role), ["back", "front", "right"]);
+  assert.ok(d.panels.every((p) => p.virtual));
+  assert.ok(Math.abs(d.box.lengthMm - (230 * 1.02) / Math.PI) < 0.2, "diamètre déduit de la circonférence");
+  assert.equal(d.foldLines.length, 0, "aucun pli ajouté au tracé");
+});
+
+test("étiquette face simple et sachet", () => {
+  const face = analyzeDieline(buildTemplate(TEMPLATES.find((t) => t.id === "etiquette-flacon")!));
+  assert.equal(face.labelMode, "face");
+  assert.deepEqual(face.panels.map((p) => p.role), ["front", "back"]);
+  const pouch = analyzeDieline(buildTemplate(TEMPLATES.find((t) => t.id === "sachet-cafe")!));
+  assert.equal(pouch.packType, "sachet");
+  assert.deepEqual(pouch.panels.map((p) => p.role).sort(), ["back", "front"]);
+  assert.ok(pouch.box.depthMm < pouch.box.lengthMm / 4, "sachet plat");
+});
+
+test("le type choisi par l'utilisateur prime sur la détection", () => {
+  const raw = buildTemplate(TEMPLATES[0]);
+  const asLabel = analyzeDieline({ ...raw, packType: undefined }, { packType: "etiquette", labelMode: "face" });
+  assert.equal(asLabel.packType, "etiquette");
+  assert.ok(asLabel.panels.every((p) => p.virtual));
+});
 
 test("analyse des chemins SVG (lignes, courbes, arcs, relatif)", () => {
   const [p] = parseSvgPath("M0 0 h10 v10 H0 z");

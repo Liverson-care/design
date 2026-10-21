@@ -1,4 +1,4 @@
-import type { Category, FontPair, Palette, StyleKey } from "@/lib/types";
+import type { FontPair, Palette, StyleKey } from "@/lib/types";
 
 export type DecorKind = "waves" | "dots" | "leaves" | "stripes" | "arc" | "confetti" | "frame" | "rays" | "none";
 
@@ -137,25 +137,26 @@ export const STYLES: StyleDef[] = [
     radius: 14,
     preview: ["#ffd23f", "#ee4266", "#3bceac"],
   },
+  {
+    key: "sante",
+    label: "Santé / officine",
+    description: "Blanc clinique, code couleur thérapeutique, lisibilité maximale",
+    palettes: [P("#ffffff", "#f1f6fb", "#0067b1", "#e3eef8", "#00a19a", "#10243e"), P("#ffffff", "#f3f8f4", "#00875a", "#e2f1e8", "#f2a900", "#12301f"), P("#fbfbfd", "#ffffff", "#c8102e", "#f8e5e8", "#0067b1", "#22161a")],
+    fonts: [
+      { heading: "Work Sans", headingWeight: 700, body: "Inter", bodyWeight: 500 },
+      { heading: "Inter", headingWeight: 800, body: "Inter", bodyWeight: 500 },
+      { heading: "Montserrat", headingWeight: 700, body: "Work Sans", bodyWeight: 500 },
+    ],
+    decor: ["stripes", "arc", "none"],
+    uppercaseName: false,
+    radius: 6,
+    preview: ["#ffffff", "#0067b1", "#00a19a"],
+  },
 ];
 
 export function styleDef(key: StyleKey): StyleDef {
   return STYLES.find((s) => s.key === key) ?? STYLES[4];
 }
-
-export const CATEGORY_COLORS: Record<Category, string> = {
-  pizza: "#c8102e",
-  poisson: "#0b5fa5",
-  nuggets: "#f29f05",
-  quiche: "#d9a21b",
-  "plat-cuisine": "#8c3b1f",
-  glace: "#e85d9e",
-  fromage: "#f2b705",
-  boulangerie: "#b9783f",
-  legumes: "#3c9d3c",
-  viande: "#8b1e1e",
-  aperitif: "#6b8e23",
-};
 
 /** Polices chargées depuis Google Fonts et largeur moyenne d'un caractère (en em) */
 export const FONTS: Record<string, { weights: number[]; charWidth: number }> = {

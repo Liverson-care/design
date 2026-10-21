@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { Brief, DesignElement, DesignScene, Dieline, Usage } from "@/lib/types";
+import type { Brief, DesignElement, DesignScene, Dieline, LabelMode, PackType, Usage } from "@/lib/types";
 import type { CheckItem, GmsReport } from "@/lib/gms/check";
 import { checkDesign } from "@/lib/gms/check";
 import { idbStorage } from "./idb-storage";
@@ -9,14 +9,15 @@ import { idbStorage } from "./idb-storage";
 export type Step = "upload" | "brief" | "results" | "editor" | "range";
 
 export const STEPS: { key: Step; label: string; hint: string }[] = [
-  { key: "upload", label: "Gabarit", hint: "PDF, AI ou SVG" },
-  { key: "brief", label: "Questionnaire", hint: "10 questions" },
+  { key: "upload", label: "Emballage", hint: "Type et tracé de découpe" },
+  { key: "brief", label: "Produit", hint: "Secteur, packshot, style" },
   { key: "results", label: "Propositions", hint: "5 designs IA" },
   { key: "editor", label: "Éditeur", hint: "Personnaliser" },
   { key: "range", label: "Gamme", hint: "Déclinaisons" },
 ];
 
 export const DEFAULT_BRIEF: Brief = {
+  sector: "alimentaire",
   brandName: "",
   productName: "",
   category: "quiche",
@@ -42,6 +43,8 @@ interface RangeState {
 interface StudioState {
   step: Step;
   projectId?: string;
+  packType: PackType | null;
+  labelMode: LabelMode;
   dieline?: Dieline;
   brief: Brief;
   designs: DesignScene[];
@@ -54,6 +57,7 @@ interface StudioState {
   hydrated: boolean;
 
   setStep: (s: Step) => void;
+  setPackType: (t: PackType, mode?: LabelMode) => void;
   setDieline: (d?: Dieline) => void;
   updateBrief: (patch: Partial<Brief>) => void;
   setDesigns: (d: DesignScene[], reports: Record<string, GmsReport>) => void;
@@ -72,6 +76,8 @@ export const useStudio = create<StudioState>()(
   persist(
     (set, get) => ({
       step: "upload",
+      packType: null,
+      labelMode: "enveloppante",
       brief: DEFAULT_BRIEF,
       designs: [],
       reports: {},
@@ -81,8 +87,10 @@ export const useStudio = create<StudioState>()(
       hydrated: false,
 
       setStep: (step) => set({ step }),
+      setPackType: (packType, mode) => set({ packType, labelMode: mode ?? get().labelMode }),
       setDieline: (dieline) => set({ dieline, designs: [], reports: {}, selectedId: undefined, validatedId: undefined, range: null }),
       updateBrief: (patch) => set({ brief: { ...get().brief, ...patch } }),
+
       setDesigns: (designs, reports) => set({ designs: [...get().designs, ...designs], reports: { ...get().reports, ...reports }, selectedId: designs[0]?.id }),
       select: (selectedId) => set({ selectedId }),
       validate: (validatedId) => set({ validatedId }),
@@ -103,13 +111,13 @@ export const useStudio = create<StudioState>()(
       setUsage: (usage) => set({ usage }),
       openPro: (proModal) => set({ proModal }),
       loadProject: (p) =>
-        set({ projectId: p.id, dieline: p.dieline, brief: { ...DEFAULT_BRIEF, ...p.brief }, designs: p.designs, reports: p.dieline ? Object.fromEntries(p.designs.map((d) => [d.id, checkDesign(d, p.dieline, p.brief)])) : {}, selectedId: p.designs[0]?.id, step: p.designs.length ? "results" : "brief", range: null }),
-      reset: () => set({ step: "upload", projectId: undefined, dieline: undefined, brief: DEFAULT_BRIEF, designs: [], reports: {}, selectedId: undefined, validatedId: undefined, range: null }),
+        set({ projectId: p.id, dieline: p.dieline, packType: p.dieline?.packType ?? "autre", brief: { ...DEFAULT_BRIEF, ...p.brief }, designs: p.designs, reports: p.dieline ? Object.fromEntries(p.designs.map((d) => [d.id, checkDesign(d, p.dieline, p.brief)])) : {}, selectedId: p.designs[0]?.id, step: p.designs.length ? "results" : "brief", range: null }),
+      reset: () => set({ step: "upload", packType: null, projectId: undefined, dieline: undefined, brief: DEFAULT_BRIEF, designs: [], reports: {}, selectedId: undefined, validatedId: undefined, range: null }),
     }),
     {
       name: "packai-studio",
       storage: createJSONStorage(() => idbStorage),
-      partialize: (s) => ({ step: s.step, projectId: s.projectId, dieline: s.dieline, brief: s.brief, designs: s.designs, reports: s.reports, selectedId: s.selectedId, validatedId: s.validatedId, range: s.range }),
+      partialize: (s) => ({ step: s.step, projectId: s.projectId, packType: s.packType, labelMode: s.labelMode, dieline: s.dieline, brief: s.brief, designs: s.designs, reports: s.reports, selectedId: s.selectedId, validatedId: s.validatedId, range: s.range }),
       onRehydrateStorage: () => () => useStudio.setState({ hydrated: true }),
     },
   ),

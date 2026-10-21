@@ -1,27 +1,13 @@
 import type { Brief, DesignScene, ImageElement, TextElement } from "@/lib/types";
 import { bestTextOn, contrastRatio, hashString, hexToRgb } from "@/lib/color";
 import { LIBRARY, matchIngredient } from "@/lib/library";
-import { CATEGORY_LABELS } from "./copy";
+import { categoryDef } from "@/lib/sectors";
 import { fitText } from "./text-fit";
-
-const FLAVORS: Record<Brief["category"], string[]> = {
-  quiche: ["Saumon", "Épinards", "Fromage", "Thon", "Lorraine", "Champignons"],
-  pizza: ["Margherita", "4 Fromages", "Jambon Champignons", "Thon", "Légumes grillés"],
-  poisson: ["Saumon", "Thon", "Cabillaud citron", "Colin basilic"],
-  nuggets: ["Poulet nature", "Poulet épicé", "Fromage", "Légumes"],
-  "plat-cuisine": ["Lasagnes bœuf", "Lasagnes saumon épinards", "Gratin légumes", "Lasagnes 3 fromages"],
-  glace: ["Vanille", "Fraise", "Chocolat", "Citron"],
-  fromage: ["Nature", "Ail & fines herbes", "Olives", "Basilic"],
-  boulangerie: ["Nature", "Fromage", "Olives", "Céréales"],
-  legumes: ["Épinards", "Tomates", "Champignons", "Méditerranéenne"],
-  viande: ["Bœuf", "Poulet", "Champignons", "Basilic"],
-  aperitif: ["Olives", "Tomates séchées", "Fromage", "Basilic"],
-};
 
 /** Propose des déclinaisons à partir du nom du produit validé (« Quiche Lorraine » → « Quiche Saumon »…). */
 export function suggestRangeNames(brief: Brief): string[] {
-  const first = brief.productName.trim().split(/\s+/)[0] || CATEGORY_LABELS[brief.category];
-  return FLAVORS[brief.category]
+  const first = brief.productName.trim().split(/\s+/)[0] || categoryDef(brief.category).label;
+  return categoryDef(brief.category).variants
     .map((f) => `${first} ${f}`)
     .filter((n) => n.toLowerCase() !== brief.productName.trim().toLowerCase())
     .slice(0, 4);

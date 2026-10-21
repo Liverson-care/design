@@ -1,11 +1,11 @@
 "use client";
 import { useState, type ReactNode } from "react";
-import type { Audience, Category, Positioning } from "@/lib/types";
+import type { Audience, Positioning } from "@/lib/types";
 import { useStudio } from "@/lib/store";
-import { CATEGORY_LABELS } from "@/lib/generator/copy";
-import { CATEGORY_COLORS, STYLES } from "@/lib/generator/styles";
+import { STYLES } from "@/lib/generator/styles";
 import { GMS_REFERENCES } from "@/lib/gms/references";
-import { dominantColors, fileToDataUrl } from "@/lib/image";
+import { SECTORS, categoryDef, sectorDef, type Sector } from "@/lib/sectors";
+import { dominantColors, fileToDataUrl, preparePackshot } from "@/lib/image";
 import { IconCheck, IconImage, IconSparkles, IconStore, IconX } from "@/components/ui/icons";
 
 const POSITIONINGS: { key: Positioning; label: string }[] = [
@@ -33,6 +33,21 @@ const SWATCHES = ["#c8102e", "#e85d04", "#f2b705", "#3c9d3c", "#00843d", "#0b5fa
 export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
   const { brief, updateBrief, usage } = useStudio();
   const [suggested, setSuggested] = useState<string[]>([]);
+  const [shotBusy, setShotBusy] = useState(false);
+  const [shotInfo, setShotInfo] = useState<string | null>(null);
+  const [cutout, setCutout] = useState(true);
+  const sector = sectorDef(brief.sector);
+  const onPackshot = async (f: File, remove = cutout) => {
+    setShotBusy(true);
+    try {
+      const shot = await preparePackshot(f, remove);
+      updateBrief({ packshot: shot.src, packshotAspect: shot.aspect, packshotColors: shot.colors });
+      setSuggested((s) => [...new Set([...shot.colors, ...s])].slice(0, 6));
+      setShotInfo(shot.removedBackground ? "Fond détouré automatiquement." : remove ? "Fond conservé (non uni ou déjà transparent)." : "Fond conservé.");
+    } finally {
+      setShotBusy(false);
+    }
+  };
   const remaining = usage.plan === "PRO" ? 5 : Math.max(0, usage.limit - usage.used);
   const valid = brief.brandName.trim() && brief.productName.trim();
 
@@ -46,7 +61,7 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
       <header className="mb-6">
         <p className="text-sm font-semibold text-brand-600">Étape 2</p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight md:text-3xl">Parlez-nous de votre produit</h1>
-        <p className="mt-1 text-ink-500">10 questions pour orienter l'IA. Les textes sont composés en vectoriel : jamais de lettres déformées.</p>
+        <p className="mt-1 text-ink-500">Une dizaine de questions pour orienter l'IA : alimentaire, épicerie, boissons, cosmétique, hygiène, médicament, compléments, animalerie ou entretien. Les textes sont composés en vectoriel : jamais de lettres déformées.</p>
       </header>
 
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (valid) onGenerate(); }}>
@@ -71,19 +86,50 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           <input className="input" placeholder="ex. Quiche Lorraine" value={brief.productName} onChange={(e) => updateBrief({ productName: e.target.value })} required aria-label="Nom du produit" />
         </Q>
 
-        <Q n={3} title="Catégorie">
-          <select className="input" value={brief.category} onChange={(e) => updateBrief({ category: e.target.value as Category })} aria-label="Catégorie">
-            {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
+        <Q n={3} title="Secteur et catégorie" hint="Les mentions obligatoires s'adaptent au secteur">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <select className="input" value={brief.sector} aria-label="Secteur" onChange={(e) => {
+              const sec = sectorDef(e.target.value as Sector);
+              updateBrief({ sector: sec.key, category: sec.categories[0].key, storage: sec.defaultStorage as typeof brief.storage, gmsReference: sec.food ? brief.gmsReference : "aucune", ...(sec.key === "medicament" ? { style: "sante" as const } : {}) });
+            }}>
+              {SECTORS.map((sc) => <option key={sc.key} value={sc.key}>{sc.label} — {sc.description}</option>)}
+            </select>
+            <select className="input" value={brief.category} onChange={(e) => updateBrief({ category: e.target.value })} aria-label="Catégorie">
+              {sector.categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          </div>
+          <p className="mt-2 text-xs text-ink-500">Réglementation appliquée : {sector.regulation}.</p>
         </Q>
 
-        <Q n={4} title="Positionnement">
+        <Q n={4} title="Photo du produit (packshot)" hint="Optionnel · le design s'adapte au produit réel">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {brief.packshot ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brief.packshot} alt="Packshot importé" className="checker h-28 w-28 shrink-0 rounded-xl object-contain p-1" />
+            ) : (
+              <div className="grid h-28 w-28 shrink-0 place-items-center rounded-xl border-2 border-dashed border-ink-200 text-ink-300"><IconImage size={28} /></div>
+            )}
+            <div className="space-y-2 text-sm">
+              <div className="flex flex-wrap gap-2">
+                <label className="btn-secondary btn-sm cursor-pointer"><IconImage size={14} /> {shotBusy ? "Préparation…" : brief.packshot ? "Remplacer" : "Importer le packshot"}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onPackshot(f); e.target.value = ""; }} />
+                </label>
+                {brief.packshot && <button type="button" className="btn-ghost btn-sm" onClick={() => { updateBrief({ packshot: undefined, packshotAspect: undefined, packshotColors: undefined }); setShotInfo(null); }}><IconX size={14} /> Retirer</button>}
+              </div>
+              <label className="flex items-center gap-2 text-xs text-ink-600"><input type="checkbox" checked={cutout} onChange={(e) => setCutout(e.target.checked)} /> Détourer automatiquement un fond uni</label>
+              <p className="text-xs text-ink-500">{shotInfo ?? "Photo du produit fini (plat, pot, flacon…) : utilisée comme visuel principal dans les 5 propositions, proportions conservées. Ses couleurs servent de palette si vous n'en choisissez pas."}</p>
+              {brief.packshotColors?.length ? <div className="flex gap-1.5">{brief.packshotColors.map((c) => <span key={c} className="h-5 w-5 rounded-full border border-black/10" style={{ background: c }} title={c} />)}</div> : null}
+            </div>
+          </div>
+        </Q>
+
+        <Q n={5} title="Positionnement">
           <Chips options={POSITIONINGS} value={brief.positioning} onChange={(positioning) => updateBrief({ positioning })} />
         </Q>
 
-        <Q n={5} title="Couleurs souhaitées" hint="Jusqu'à 3 · laissez vide pour laisser l'IA choisir">
+        <Q n={6} title="Couleurs souhaitées" hint="Jusqu'à 3 · laissez vide pour laisser l'IA choisir">
           <div className="flex flex-wrap items-center gap-2">
-            {[...new Set([CATEGORY_COLORS[brief.category], ...suggested, ...SWATCHES])].map((c) => {
+            {[...new Set([categoryDef(brief.category).color, ...suggested, ...SWATCHES])].map((c) => {
               const on = brief.colors.includes(c);
               return (
                 <button type="button" key={c} onClick={() => toggleColor(c)} className={`relative h-9 w-9 rounded-full border transition ${on ? "scale-110 ring-2 ring-brand-500 ring-offset-2" : "border-ink-200 hover:scale-105"}`} style={{ background: c }} aria-label={`Couleur ${c}`} aria-pressed={on}>
@@ -99,7 +145,7 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           {suggested.length > 0 && <p className="mt-2 text-xs text-ink-500">Les premières pastilles sont extraites de vos inspirations.</p>}
         </Q>
 
-        <Q n={6} title="Style graphique">
+        <Q n={7} title="Style graphique">
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {STYLES.map((s) => (
               <button type="button" key={s.key} onClick={() => updateBrief({ style: s.key })} className={`rounded-xl border p-3 text-left transition ${brief.style === s.key ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100" : "border-ink-200 bg-white hover:border-brand-300"}`} aria-pressed={brief.style === s.key}>
@@ -113,17 +159,17 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           </div>
         </Q>
 
-        <Q n={7} title="Public cible">
+        <Q n={8} title="Public cible">
           <Chips options={AUDIENCES} value={brief.audience} onChange={(audience) => updateBrief({ audience })} />
         </Q>
 
-        <Q n={8} title="Pays de vente">
+        <Q n={9} title="Pays de vente">
           <select className="input" value={brief.country} onChange={(e) => updateBrief({ country: e.target.value })} aria-label="Pays de vente">
             {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </Q>
 
-        <Q n={9} title="Inspirations" hint="Optionnel · emballages, ambiances, moodboard">
+        <Q n={10} title="Inspirations" hint="Optionnel · emballages, ambiances, moodboard">
           <div className="flex flex-wrap gap-2">
             {brief.inspirations.map((src, i) => (
               <div key={i} className="group relative">
@@ -147,30 +193,34 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           </div>
         </Q>
 
-        <Q n={10} title="Contraintes" hint="Logo obligatoire, texte existant, mentions imposées…">
+        <Q n={11} title="Contraintes" hint="Logo obligatoire, texte existant, mentions imposées…">
           <textarea className="input min-h-[84px]" placeholder="ex. Logo obligatoire en haut à gauche, fond blanc, mention « Recette du chef »" value={brief.constraints} onChange={(e) => updateBrief({ constraints: e.target.value })} aria-label="Contraintes" />
         </Q>
 
         <div className="card grid gap-4 p-5 sm:grid-cols-3">
           <div>
-            <label className="label" htmlFor="weight">Poids net</label>
-            <input id="weight" className="input" value={brief.netWeight} onChange={(e) => updateBrief({ netWeight: e.target.value })} placeholder="400 g" />
+            <label className="label" htmlFor="weight">{sector.weightLabel}</label>
+            <input id="weight" className="input" value={brief.netWeight} onChange={(e) => updateBrief({ netWeight: e.target.value })} placeholder={sector.key === "medicament" ? "16 comprimés" : sector.weightLabel === "Contenance" || sector.weightLabel === "Volume net" ? "250 ml" : "400 g"} />
           </div>
           <div>
             <label className="label" htmlFor="benefit">Bénéfice principal</label>
             <input id="benefit" className="input" value={brief.benefit} onChange={(e) => updateBrief({ benefit: e.target.value })} placeholder="Proposé par l'IA si vide" />
           </div>
-          <div>
-            <label className="label" htmlFor="storage">Conservation</label>
-            <select id="storage" className="input" value={brief.storage} onChange={(e) => updateBrief({ storage: e.target.value as typeof brief.storage })}>
-              <option value="surgele">Surgelé</option>
-              <option value="frais">Frais</option>
-              <option value="ambiant">Ambiant / épicerie</option>
-            </select>
-          </div>
+          {sector.storage ? (
+            <div>
+              <label className="label" htmlFor="storage">Conservation</label>
+              <select id="storage" className="input" value={brief.storage} onChange={(e) => updateBrief({ storage: e.target.value as typeof brief.storage })}>
+                <option value="surgele">Surgelé</option>
+                <option value="frais">Frais</option>
+                <option value="ambiant">Ambiant</option>
+              </select>
+            </div>
+          ) : (
+            <div className="text-xs text-ink-500"><span className="label">Conservation</span>Mention adaptée au secteur {sector.label.toLowerCase()}.</div>
+          )}
         </div>
 
-        <div className="card overflow-hidden">
+        {sector.food && <div className="card overflow-hidden">
           <div className="flex items-center gap-3 border-b border-ink-100 bg-gradient-to-r from-[#002395]/5 via-white to-[#ed2939]/5 px-5 py-4">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-900 text-white"><IconStore size={20} /></span>
             <div>
@@ -187,7 +237,7 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         <div className="sticky bottom-4 z-10 flex flex-col items-center justify-between gap-3 rounded-2xl border border-brand-100 bg-white/95 p-4 shadow-pop backdrop-blur sm:flex-row">
           <p className="text-sm text-ink-600">

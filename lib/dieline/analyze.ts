@@ -1,9 +1,11 @@
-import type { Dieline, DielineSource, Panel, PanelRole, Pt, Segment } from "@/lib/types";
+import type { Dieline, DielineSource, LabelMode, PackType, Panel, PanelRole, Pt, Segment } from "@/lib/types";
 import { bbox, chainSegments, isClosed, pathToSegments, pointInPolygon, polygonArea, round } from "./geometry";
 
 export interface RawDieline {
   name: string;
   source: DielineSource;
+  packType?: PackType;
+  labelMode?: LabelMode;
   cutPaths: Pt[][];
   foldLines: Segment[];
   originalPreview?: string;
@@ -18,7 +20,8 @@ const CLUSTER_TOL = 0.6; // mm
  * Détecte automatiquement dimensions, zones imprimables (panneaux), plis et découpes.
  * La géométrie d'origine est conservée à l'identique (simple translation à l'origine).
  */
-export function analyzeDieline(raw: RawDieline): Dieline {
+export function analyzeDieline(raw: RawDieline, opts: { packType?: PackType; labelMode?: LabelMode } = {}): Dieline {
+  const packType = opts.packType ?? raw.packType ?? "autre";
   const warnings = [...(raw.warnings ?? [])];
   const allPts = [...raw.cutPaths.flat(), ...raw.foldLines.flatMap((s) => [s.a, s.b])];
   if (allPts.length < 3) throw new Error("Aucun tracé vectoriel exploitable n'a été trouvé dans ce fichier.");
@@ -38,15 +41,25 @@ export function analyzeDieline(raw: RawDieline): Dieline {
     { x: 0, y: 0 }, { x: widthMm, y: 0 }, { x: widthMm, y: heightMm }, { x: 0, y: heightMm },
   ];
 
-  const panels = detectPanels(poly, cutPaths, foldLines, widthMm, heightMm);
+  let panels = detectPanels(poly, cutPaths, foldLines, widthMm, heightMm);
   assignRoles(panels);
-  if (!foldLines.length) warnings.push("Aucune ligne de pli détectée : le gabarit est traité comme une étiquette à plat.");
+  let labelMode: LabelMode | undefined;
+  if (packType === "etiquette" || (packType === "sachet" && panels.length < 2)) {
+    // Pas de pli porteur de sens : on découpe l'étiquette en zones logiques, sans toucher au tracé.
+    labelMode = opts.labelMode ?? raw.labelMode ?? (widthMm >= heightMm * 2.2 ? "enveloppante" : "face");
+    panels = labelZones(widthMm, heightMm, packType === "sachet" ? "sachet" : labelMode);
+  } else {
+    if (!foldLines.length) warnings.push("Aucune ligne de pli détectée : choisissez le type « Étiquette » si c'est une étiquette à plat.");
+    if (packType === "etui" && !panels.some((p) => p.role === "left" || p.role === "right")) warnings.push("Côtés de l'étui non identifiés : vérifiez l'attribution des panneaux.");
+  }
   if (!panels.some((p) => p.role === "front")) warnings.push("Face avant non identifiée : vérifiez l'attribution des panneaux.");
 
   return {
     id: `dl_${Math.random().toString(36).slice(2, 10)}`,
     name: raw.name,
     source: raw.source,
+    packType,
+    labelMode,
     widthMm: round(widthMm, 1),
     heightMm: round(heightMm, 1),
     cutPaths,
@@ -54,7 +67,7 @@ export function analyzeDieline(raw: RawDieline): Dieline {
     panels,
     bleedMm: raw.bleedMm ?? 3,
     safeMarginMm: 3,
-    box: boxDimensions(panels),
+    box: packType === "etiquette" ? labelBox(widthMm, heightMm, labelMode ?? "face") : boxDimensions(panels, packType),
     originalPreview: raw.originalPreview,
     warnings,
   };
@@ -232,7 +245,33 @@ export function assignRoles(panels: Panel[]): void {
   if (bottom && bottom.role === "flap") bottom.role = "bottom";
 }
 
-export function boxDimensions(panels: Panel[]): Dieline["box"] {
+/** Zones logiques d'une étiquette (ou d'un sachet sans pli) */
+export function labelZones(W: number, H: number, mode: LabelMode | "sachet"): Panel[] {
+  const z = (id: string, role: PanelRole, x: number, y: number, w: number, h: number): Panel => ({ id, role, x: round(x, 2), y: round(y, 2), w: round(w, 2), h: round(h, 2), virtual: true });
+  if (mode === "sachet") {
+    return W >= H ? [z("z1", "front", 0, 0, W / 2, H), z("z2", "back", W / 2, 0, W / 2, H)] : [z("z1", "front", 0, 0, W, H / 2), z("z2", "back", 0, H / 2, W, H / 2)];
+  }
+  if (mode === "enveloppante") {
+    // Face au centre ; mentions à gauche, informations (lot, EAN, tri) à droite : les deux se rejoignent à l'arrière du pot.
+    return [z("z1", "back", 0, 0, W * 0.32, H), z("z2", "front", W * 0.32, 0, W * 0.4, H), z("z3", "right", W * 0.72, 0, W * 0.28, H)];
+  }
+  return W >= H
+    ? [z("z1", "front", 0, 0, W * 0.56, H), z("z2", "back", W * 0.56, 0, W * 0.44, H)]
+    : [z("z1", "front", 0, 0, W, H * 0.56), z("z2", "back", 0, H * 0.56, W, H * 0.44)];
+}
+
+/** Contenant cylindrique d'une étiquette : diamètre déduit de la longueur de l'étiquette */
+export function labelBox(W: number, H: number, mode: LabelMode): Dieline["box"] {
+  const circumference = mode === "enveloppante" ? W * 1.02 : W / 0.42;
+  const d = round(circumference / Math.PI, 1);
+  return { lengthMm: d, heightMm: round(H, 1), depthMm: d };
+}
+
+export function boxDimensions(panels: Panel[], packType: PackType = "etui"): Dieline["box"] {
+  if (packType === "sachet") {
+    const front = panels.find((p) => p.role === "front") ?? panels[0];
+    return { lengthMm: round(front?.w ?? 100, 1), heightMm: round(front?.h ?? 100, 1), depthMm: round(Math.max(6, (front?.w ?? 100) * 0.12), 1) };
+  }
   const front = panels.find((p) => p.role === "front") ?? panels[0];
   const side = panels.find((p) => p.role === "left" || p.role === "right");
   const lid = panels.find((p) => p.role === "top" || p.role === "bottom");

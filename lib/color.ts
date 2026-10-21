@@ -41,7 +41,8 @@ export function bestTextOn(bg: string, dark = "#1b1b1f", light = "#ffffff"): str
 /** Ajuste une couleur de texte jusqu'à atteindre le ratio de contraste demandé */
 export function ensureContrast(fg: string, bg: string, ratio = 4.5): string {
   if (contrastRatio(fg, bg) >= ratio) return fg;
-  const target = luminance(bg) > 0.4 ? "#000000" : "#ffffff";
+  // Pivot exact où noir et blanc offrent le même contraste : √(1,05 × 0,05) − 0,05 ≈ 0,179
+  const target = luminance(bg) > 0.179 ? "#000000" : "#ffffff";
   for (let t = 0.1; t <= 1; t += 0.1) {
     const c = mix(fg, target, t);
     if (contrastRatio(c, bg) >= ratio) return c;

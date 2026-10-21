@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="230mm" height="70mm" viewBox="0 0 230 70">
+  <title>Étiquette bocal enveloppante — tracé de découpe</title>
+  <g id="Decoupe" fill="none" stroke="#e5262b" stroke-width="0.25">
+    <path d="M3 0 L227 0 L230 3 L230 67 L227 70 L3 70 L0 67 L0 3 L3 0Z"/>
+  </g>
+  <g id="Rainage" fill="none" stroke="#14a44d" stroke-width="0.25" stroke-dasharray="3 2">
+    
+  </g>
+</svg>

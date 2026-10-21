@@ -1,11 +1,11 @@
-import type { Pt, Segment } from "@/lib/types";
+import type { LabelMode, PackType, Pt, Segment } from "@/lib/types";
 import type { RawDieline } from "./analyze";
 
 export interface TemplateSpec {
   id: string;
   label: string;
   description: string;
-  kind: "tuck" | "sleeve";
+  kind: "tuck" | "sleeve" | "label" | "pouch";
   length: number; // largeur de la face avant
   depth: number; // profondeur (côtés)
   height: number; // hauteur de la face avant
@@ -17,13 +17,34 @@ export const TEMPLATES: TemplateSpec[] = [
   { id: "etui-quiche", label: "Étui quiche", description: "Étui 220 × 50 × 220 mm", kind: "tuck", length: 220, depth: 50, height: 220 },
   { id: "fourreau-plat", label: "Fourreau plat cuisiné", description: "Fourreau pour barquette 190 × 50 × 140 mm", kind: "sleeve", length: 190, depth: 50, height: 140 },
   { id: "etui-glace", label: "Étui bâtonnets glacés", description: "Étui 140 × 45 × 190 mm", kind: "tuck", length: 140, depth: 45, height: 190 },
+  { id: "etiquette-bocal", label: "Étiquette bocal enveloppante", description: "Étiquette 230 × 70 mm", kind: "label", length: 230, depth: 0, height: 70 },
+  { id: "etiquette-flacon", label: "Étiquette flacon face", description: "Étiquette 60 × 90 mm", kind: "label", length: 60, depth: 0, height: 90 },
+  { id: "sachet-cafe", label: "Sachet café", description: "Sachet 130 × 220 mm (recto + verso)", kind: "pouch", length: 130, depth: 0, height: 220 },
 ];
 
 const seg = (ax: number, ay: number, bx: number, by: number): Segment => ({ a: { x: ax, y: ay }, b: { x: bx, y: by } });
 
 /** Génère un tracé de découpe paramétrique (étui à pattes rentrantes inversées ou fourreau). */
+/** Gabarit standard d'un type d'emballage aux dimensions saisies par l'utilisateur */
+export function templateForPackType(type: PackType, dims: { length: number; height: number; depth?: number }, labelMode?: LabelMode): RawDieline {
+  const kind: TemplateSpec["kind"] = type === "etiquette" ? "label" : type === "sachet" ? "pouch" : type === "fourreau" ? "sleeve" : "tuck";
+  const raw = buildTemplate({ id: type, label: "", description: "", kind, length: dims.length, height: dims.height, depth: dims.depth ?? 50 });
+  const names: Record<TemplateSpec["kind"], string> = { tuck: "Étui 4 faces", sleeve: "Fourreau", label: "Étiquette", pouch: "Sachet" };
+  return { ...raw, name: `${names[kind]} ${dims.length} × ${dims.height}${kind === "tuck" || kind === "sleeve" ? ` × ${dims.depth ?? 50}` : ""} mm`, packType: type, labelMode };
+}
+
 export function buildTemplate(spec: TemplateSpec): RawDieline {
   const L = spec.length, W = spec.depth, H = spec.height;
+  if (spec.kind === "label") {
+    const r = 3;
+    const P: Pt[] = [{ x: r, y: 0 }, { x: L - r, y: 0 }, { x: L, y: r }, { x: L, y: H - r }, { x: L - r, y: H }, { x: r, y: H }, { x: 0, y: H - r }, { x: 0, y: r }, { x: r, y: 0 }];
+    return { name: spec.label, source: "template", cutPaths: [P], foldLines: [], packType: "etiquette" };
+  }
+  if (spec.kind === "pouch") {
+    // Recto | verso, pli de séparation au centre (impression en bande)
+    const P: Pt[] = [{ x: 0, y: 0 }, { x: 2 * L, y: 0 }, { x: 2 * L, y: H }, { x: 0, y: H }, { x: 0, y: 0 }];
+    return { name: spec.label, source: "template", cutPaths: [P], foldLines: [seg(L, 0, L, H)], packType: "sachet" };
+  }
   const glue = 15;
   const tuck = spec.kind === "tuck" ? 15 : 0;
   const dust = spec.kind === "tuck" ? Math.min(W * 0.8, L / 2) : 0;
@@ -81,7 +102,7 @@ export function buildTemplate(spec: TemplateSpec): RawDieline {
 
   folds.push(seg(xG, yRowTop, xG, yRowBot), seg(xS1, yRowTop, xS1, yRowBot), seg(xF, yRowTop, xF, yRowBot), seg(xS2, yRowTop, xS2, yRowBot));
 
-  return { name: spec.label, source: "template", cutPaths: [P], foldLines: folds };
+  return { name: spec.label, source: "template", cutPaths: [P], foldLines: folds, packType: spec.kind === "tuck" ? "etui" : "fourreau" };
 }
 
 /** Export SVG respectant les conventions d'atelier (découpe rouge continue, pli vert pointillé). */

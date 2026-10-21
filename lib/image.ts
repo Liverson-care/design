@@ -54,3 +54,85 @@ export function dominantColors(src: string, count = 4): Promise<string[]> {
     img.src = src;
   });
 }
+
+export interface Packshot {
+  src: string;
+  aspect: number;
+  colors: string[];
+  removedBackground: boolean;
+}
+
+/**
+ * Prépare un packshot : redimensionnement, détourage automatique d'un fond uni (studio blanc ou couleur)
+ * par propagation depuis les bords, recadrage sur le produit, puis extraction des couleurs dominantes.
+ * Un PNG déjà transparent est conservé tel quel.
+ */
+export async function preparePackshot(file: File, removeBackground = true): Promise<Packshot> {
+  const src = await fileToDataUrl(file, 1600);
+  const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Image illisible")); i.src = src; });
+  const c = document.createElement("canvas");
+  c.width = img.width; c.height = img.height;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  const W = c.width, H = c.height;
+  const data = ctx.getImageData(0, 0, W, H);
+  const px = data.data;
+  const alphaAlready = (() => { for (let i = 3; i < px.length; i += 4 * 97) if (px[i] < 250) return true; return false; })();
+  let removed = false;
+  if (removeBackground && !alphaAlready) {
+    // Couleur de fond = médiane des pixels de bordure ; on n'agit que si la bordure est homogène.
+    const border: number[][] = [];
+    for (let x = 0; x < W; x += 4) { border.push(rgbAt(px, W, x, 0), rgbAt(px, W, x, H - 1)); }
+    for (let y = 0; y < H; y += 4) { border.push(rgbAt(px, W, 0, y), rgbAt(px, W, W - 1, y)); }
+    const med = [0, 1, 2].map((k) => border.map((b) => b[k]).sort((a, b) => a - b)[border.length >> 1]);
+    const spread = border.filter((b) => dist3(b, med) > 40).length / border.length;
+    if (spread < 0.25) {
+      const tol = 38;
+      // Parcours en largeur avec file typée : chaque pixel n'est visité qu'une fois (mémoire bornée).
+      const queued = new Uint8Array(W * H);
+      const queue = new Int32Array(W * H);
+      let head = 0, tail = 0;
+      const push = (i: number) => { if (!queued[i]) { queued[i] = 1; queue[tail++] = i; } };
+      for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+      for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+      while (head < tail) {
+        const i = queue[head++];
+        const o = i * 4;
+        const d = dist3([px[o], px[o + 1], px[o + 2]], med);
+        if (d > tol) continue;
+        // Bord adouci : alpha proportionnel à l'écart avec le fond
+        px[o + 3] = d < tol * 0.55 ? 0 : Math.round(((d - tol * 0.55) / (tol * 0.45)) * 255);
+        const x = i % W;
+        if (x > 0) push(i - 1);
+        if (x < W - 1) push(i + 1);
+        if (i >= W) push(i - W);
+        if (i < W * (H - 1)) push(i + W);
+      }
+      ctx.putImageData(data, 0, 0);
+      removed = true;
+    }
+  }
+  // Recadrage sur la zone opaque
+  let minX = W, minY = H, maxX = 0, maxY = 0;
+  const after = ctx.getImageData(0, 0, W, H).data;
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
+    if (after[(y * W + x) * 4 + 3] > 24) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  }
+  if (maxX <= minX || maxY <= minY) { minX = 0; minY = 0; maxX = W - 1; maxY = H - 1; }
+  const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.02);
+  minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad); maxX = Math.min(W - 1, maxX + pad); maxY = Math.min(H - 1, maxY + pad);
+  const out = document.createElement("canvas");
+  out.width = maxX - minX + 1; out.height = maxY - minY + 1;
+  out.getContext("2d")!.drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+  const result = out.toDataURL("image/png");
+  return { src: result, aspect: out.width / out.height, colors: await dominantColors(result, 3), removedBackground: removed };
+}
+
+function rgbAt(px: Uint8ClampedArray, W: number, x: number, y: number): number[] {
+  const o = (y * W + x) * 4;
+  return [px[o], px[o + 1], px[o + 2]];
+}
+
+function dist3(a: number[], b: number[]): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}

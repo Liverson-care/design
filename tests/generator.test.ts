@@ -8,6 +8,7 @@ import { checkDesign, checkRange } from "../lib/gms/check";
 import type { Brief } from "../lib/types";
 
 const brief: Brief = {
+  sector: "alimentaire",
   brandName: "Maison Dorée",
   productName: "Quiche Lorraine",
   category: "quiche",
@@ -25,7 +26,7 @@ const brief: Brief = {
 };
 
 const REFS = ["aucune", "picard", "findus", "marie", "fleury-michon", "carrefour"] as const;
-for (const spec of TEMPLATES) for (const gmsReference of REFS) {
+for (const spec of TEMPLATES.filter((t) => t.kind === "tuck" || t.kind === "sleeve")) for (const gmsReference of REFS) {
   test(`5 designs distincts et conformes — ${spec.label} · ${gmsReference}`, () => {
     const dieline = analyzeDieline(buildTemplate(spec));
     const before = JSON.stringify({ c: dieline.cutPaths, f: dieline.foldLines, p: dieline.panels });
@@ -43,6 +44,42 @@ for (const spec of TEMPLATES) for (const gmsReference of REFS) {
     }
   });
 }
+
+import { SECTORS } from "../lib/sectors";
+
+for (const sector of SECTORS) {
+  test(`secteur ${sector.label} : mentions obligatoires présentes sur étui, étiquette et sachet`, () => {
+    for (const id of ["etui-nuggets", "etiquette-bocal", "sachet-cafe"]) {
+      const dieline = analyzeDieline(buildTemplate(TEMPLATES.find((t) => t.id === id)!));
+      const c = sector.categories[0];
+      const b: Brief = { ...brief, sector: sector.key, category: c.key, productName: c.label, storage: sector.defaultStorage as Brief["storage"], netWeight: "250 g" };
+      for (const d of generateDesigns(dieline, b, 5)) {
+        const legal = checkDesign(d, dieline, b).items.find((i) => i.id === "legal")!;
+        assert.ok(!/Manquant/.test(legal.detail), `${id} · ${d.layout} : ${legal.detail}`);
+        const fails = checkDesign(d, dieline, b).items.filter((i) => i.status === "fail");
+        assert.deepEqual(fails.map((f) => f.label), [], `${id} · ${d.layout}`);
+      }
+    }
+  });
+}
+
+test("packshot importé : utilisé comme visuel principal sans déformation", () => {
+  const dieline = analyzeDieline(buildTemplate(TEMPLATES[0]));
+  const shot = "data:image/png;base64,AAAA";
+  const [d] = generateDesigns(dieline, { ...brief, colors: [], packshot: shot, packshotAspect: 0.5, packshotColors: ["#123456", "#abcdef"] }, 1);
+  const img = d.elements.find((e) => e.kind === "image" && e.src === shot)!;
+  assert.ok(img, "packshot présent");
+  assert.ok(Math.abs(img.w / img.h - 0.5) < 0.01, "proportions conservées");
+  assert.equal(d.palette.primary, "#123456", "palette tirée du packshot");
+});
+
+test("médicament : braille et DCI", () => {
+  const dieline = analyzeDieline(buildTemplate(TEMPLATES[0]));
+  const b: Brief = { ...brief, sector: "medicament", category: "antalgique", productName: "Algidol", netWeight: "16 comprimés" };
+  const [d] = generateDesigns(dieline, b, 1);
+  assert.ok(d.elements.some((e) => e.legalKey === "braille" && e.kind === "text" && /⠁⠇⠛⠊⠙⠕⠇/.test(e.text)));
+  assert.ok(d.elements.some((e) => e.legalKey === "dci" && e.panelId === dieline.panels.find((p) => p.role === "front")!.id));
+});
 
 test("gamme complète cohérente", () => {
   const dieline = analyzeDieline(buildTemplate(TEMPLATES[2]));

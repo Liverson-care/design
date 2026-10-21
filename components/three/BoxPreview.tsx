@@ -3,22 +3,12 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import type { DesignScene, Dieline, Panel, PanelRole } from "@/lib/types";
+import type { DesignScene, Dieline } from "@/lib/types";
 import { renderSceneToCanvas } from "@/lib/render/konva-scene";
-import { hingedOnBack } from "@/lib/generator/generate";
+import { buildPackModel, type PackModel } from "@/lib/render/three-pack";
 
 export interface BoxPreviewHandle {
   snapshot: () => HTMLCanvasElement | null;
-}
-
-function crop(src: HTMLCanvasElement, p: Panel, px: number, rotate180 = false): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = Math.max(2, Math.round(p.w * px));
-  c.height = Math.max(2, Math.round(p.h * px));
-  const ctx = c.getContext("2d")!;
-  if (rotate180) { ctx.translate(c.width, c.height); ctx.rotate(Math.PI); }
-  ctx.drawImage(src, p.x * px, p.y * px, p.w * px, p.h * px, 0, 0, c.width, c.height);
-  return c;
 }
 
 /**
@@ -76,8 +66,7 @@ export const BoxPreview = forwardRef<BoxPreviewHandle, { scene: DesignScene; die
       const pmrem = new THREE.PMREMGenerator(renderer);
       three.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-      const { lengthMm: L, heightMm: H, depthMm: D } = dieline.box;
-      const size = Math.max(L, H, D);
+      const size = dieline.packType === "etiquette" ? Math.max(dieline.box.lengthMm, dieline.box.heightMm * 1.5) : Math.max(dieline.box.lengthMm, dieline.box.heightMm, dieline.box.depthMm);
       const camera = new THREE.PerspectiveCamera(30, 1, 1, size * 20);
       camera.position.set(size * 1.5, size * 1.15, size * 2.4);
 
@@ -94,7 +83,6 @@ export const BoxPreview = forwardRef<BoxPreviewHandle, { scene: DesignScene; die
 
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(size * 8, size * 8), new THREE.ShadowMaterial({ opacity: 0.18 }));
       ground.rotation.x = -Math.PI / 2;
-      ground.position.y = -H / 2 - 0.2;
       ground.receiveShadow = true;
       three.add(ground);
 
@@ -120,43 +108,15 @@ export const BoxPreview = forwardRef<BoxPreviewHandle, { scene: DesignScene; die
       const ro = new ResizeObserver(resize);
       ro.observe(el);
 
-      const materials: THREE.Material[] = [];
-      const textures: THREE.Texture[] = [];
-      let mesh: THREE.Mesh | null = null;
+      let model: PackModel | null = null;
 
       (async () => {
-        const px = Math.min(6, 2048 / Math.max(L, H));
+        const px = Math.min(6, 2048 / Math.max(dieline.widthMm, dieline.heightMm));
         const flat = await renderSceneToCanvas(scene, dieline, { px });
         if (disposed) return;
-        const find = (r: PanelRole) => dieline.panels.find((p) => p.role === r);
-        const top = find("top");
-        const bottom = find("bottom");
-        const topOnBack = !!top && hingedOnBack(top, dieline);
-        const bottomOnBack = !!bottom && hingedOnBack(bottom, dieline);
-        const faces: [PanelRole, boolean][] = [["right", false], ["left", false], ["top", topOnBack], ["bottom", bottomOnBack], ["front", false], ["back", false]];
-        const maxAniso = renderer.capabilities.getMaxAnisotropy();
-        for (const [role, rot] of faces) {
-          const panel = find(role);
-          let mat: THREE.MeshStandardMaterial;
-          if (panel) {
-            const tex = new THREE.CanvasTexture(crop(flat, panel, px, rot));
-            tex.colorSpace = THREE.SRGBColorSpace;
-            tex.anisotropy = maxAniso;
-            textures.push(tex);
-            mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, metalness: 0, envMapIntensity: 0.6 });
-          } else {
-            // Fourreau : dessus/dessous ouverts → barquette blanche
-            mat = new THREE.MeshStandardMaterial({ color: role === "top" || role === "bottom" ? 0xf3f3f1 : new THREE.Color(scene.palette.primary), roughness: 0.35 });
-          }
-          materials.push(mat);
-        }
-        const geo = new THREE.BoxGeometry(L, H, D);
-        mesh = new THREE.Mesh(geo, materials);
-        mesh.castShadow = true;
-        three.add(mesh);
-        // Arêtes légèrement marquées pour l'effet carton
-        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 }));
-        mesh.add(edges);
+        model = buildPackModel(scene, dieline, flat, px, renderer.capabilities.getMaxAnisotropy());
+        ground.position.y = model.groundY;
+        three.add(model.object);
         setReady(true);
       })().catch(() => setError("Impossible de construire l'aperçu 3D."));
 
@@ -173,9 +133,7 @@ export const BoxPreview = forwardRef<BoxPreviewHandle, { scene: DesignScene; die
         cancelAnimationFrame(frame);
         ro.disconnect();
         controls.dispose();
-        textures.forEach((t) => t.dispose());
-        materials.forEach((m) => m.dispose());
-        mesh?.geometry.dispose();
+        model?.dispose();
         pmrem.dispose();
         renderer.dispose();
         renderer.domElement.remove();

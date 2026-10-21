@@ -6,8 +6,8 @@ import { PRO_FEATURES } from "@/lib/pro";
 import { IconBox, IconCheck, IconEdit, IconGrid, IconShield, IconSparkles, IconStore, IconUpload } from "@/components/ui/icons";
 
 const STEPS = [
-  { icon: IconUpload, title: "Importez votre gabarit", text: "PDF, AI ou SVG : dimensions, plis, découpes et zones imprimables détectés automatiquement." },
-  { icon: IconEdit, title: "Répondez à 10 questions", text: "Marque, produit, positionnement, couleurs, style, cible, pays de vente, inspirations et contraintes." },
+  { icon: IconUpload, title: "Type d'emballage et tracé", text: "Étiquette, étui 4 faces, fourreau ou sachet, puis le tracé en PDF, AI ou SVG : dimensions, plis, découpes et zones détectés." },
+  { icon: IconEdit, title: "Votre produit", text: "Secteur, catégorie, packshot du produit fini, positionnement, couleurs, style, cible, pays, inspirations et contraintes." },
   { icon: IconSparkles, title: "Recevez 5 designs", text: "Appliqués directement sur votre gabarit, en vue à plat et en boîte 3D, prêts à présenter." },
 ];
 
@@ -37,17 +37,17 @@ export default function Home() {
         <div className="pointer-events-none absolute -left-40 -top-40 -z-10 h-[520px] w-[520px] rounded-full bg-brand-200/50 blur-3xl" />
         <div className="pointer-events-none absolute -right-40 top-20 -z-10 h-[420px] w-[420px] rounded-full bg-fuchsia-200/40 blur-3xl" />
         <div className="animate-fade-up">
-          <span className="badge bg-brand-100 text-brand-800"><IconSparkles size={12} /> Pensé pour l'agroalimentaire et la grande distribution</span>
+          <span className="badge bg-brand-100 text-brand-800"><IconSparkles size={12} /> Alimentaire, épicerie, boissons, cosmétique, santé, entretien</span>
           <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-ink-900 md:text-6xl">
-            Vos emballages alimentaires, <span className="bg-gradient-to-r from-brand-600 to-fuchsia-600 bg-clip-text text-transparent">designés par l'IA</span> sur votre gabarit.
+            Vos emballages, <span className="bg-gradient-to-r from-brand-600 to-fuchsia-600 bg-clip-text text-transparent">designés par l'IA</span> sur votre gabarit.
           </h1>
-          <p className="mt-5 max-w-xl text-lg text-ink-600">Importez votre tracé de découpe, répondez à 10 questions : PackAI Designer crée 5 propositions prêtes pour le rayon, en vue à plat et en 3D.</p>
+          <p className="mt-5 max-w-xl text-lg text-ink-600">Choisissez votre type d'emballage (étiquette, étui, fourreau, sachet), importez le tracé de découpe et la photo de votre produit : PackAI Designer crée 5 propositions prêtes pour le rayon, en vue à plat et en 3D.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/studio" className="btn-primary !px-6 !py-3.5 text-base">Créer mes 5 designs gratuits</Link>
             <a href="#fonctionnement" className="btn-secondary !px-6 !py-3.5 text-base">Voir comment ça marche</a>
           </div>
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-600">
-            {["Sans carte bancaire", "PDF · AI · SVG", "Découpes jamais modifiées"].map((t) => <li key={t} className="flex items-center gap-1.5"><IconCheck size={16} className="text-emerald-600" />{t}</li>)}
+            {["Sans carte bancaire", "PDF · AI · SVG", "Packshot détouré", "Mentions adaptées au secteur"].map((t) => <li key={t} className="flex items-center gap-1.5"><IconCheck size={16} className="text-emerald-600" />{t}</li>)}
           </ul>
         </div>
         <HeroLoader />

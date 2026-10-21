@@ -1,5 +1,3 @@
-import type { Category } from "@/lib/types";
-
 export interface LibraryItem {
   id: string;
   name: string;
@@ -11,7 +9,7 @@ export interface LibraryItem {
 }
 
 /**
- * Banque d'éléments graphiques alimentaires (fonds transparents).
+ * Banque d'éléments graphiques (fonds transparents) : alimentaire, épicerie, boissons, beauté, santé, animalerie, entretien.
  * Les visuels fournis sont des illustrations détaillées ; lorsqu'une clé OpenAI est configurée,
  * chaque élément peut être remplacé par une photographie culinaire générée (bouton « Version photo IA »).
  */
@@ -34,38 +32,20 @@ export const LIBRARY: LibraryItem[] = [
   { id: "pain", name: "Pain de campagne", group: "Pain", src: "/assets/food/pain.svg", color: "#c58940", keywords: ["pain", "baguette", "brioche", "viennoiserie"] },
   { id: "quiche", name: "Quiche", group: "Plats", src: "/assets/food/quiche.svg", color: "#e2b04a", keywords: ["quiche", "tarte"] },
   { id: "lasagnes", name: "Lasagnes", group: "Plats", src: "/assets/food/lasagnes.svg", color: "#c2512f", keywords: ["lasagne", "gratin", "plat"] },
+  { id: "pates", name: "Pâtes", group: "Épicerie", src: "/assets/food/pates.svg", color: "#e2a03a", keywords: ["pâte", "pate", "spaghetti", "penne", "fusilli", "coquillette"] },
+  { id: "cafe", name: "Grains de café", group: "Épicerie", src: "/assets/food/cafe.svg", color: "#6f4e37", keywords: ["café", "cafe", "arabica", "expresso"] },
+  { id: "biscuit", name: "Biscuits", group: "Épicerie", src: "/assets/food/biscuit.svg", color: "#c58940", keywords: ["biscuit", "sablé", "gâteau", "cookie", "caramel"] },
+  { id: "goutte", name: "Goutte d'eau", group: "Boissons", src: "/assets/food/goutte.svg", color: "#1e88e5", keywords: ["eau", "gazeuse", "plate", "hydrat"] },
+  { id: "menthe", name: "Menthe", group: "Boissons", src: "/assets/food/menthe.svg", color: "#2e9e6a", keywords: ["menthe", "fraîcheur", "fraicheur", "mojito"] },
+  { id: "creme", name: "Pot de crème", group: "Beauté & santé", src: "/assets/food/creme.svg", color: "#c7a17a", keywords: ["crème", "creme", "soin", "peau", "karité", "change"] },
+  { id: "flacon", name: "Flacon pompe", group: "Beauté & santé", src: "/assets/food/flacon.svg", color: "#8fb9a8", keywords: ["flacon", "lait", "shampooing", "gel", "douche"] },
+  { id: "lavande", name: "Lavande", group: "Beauté & santé", src: "/assets/food/lavande.svg", color: "#8e7cc3", keywords: ["lavande", "fleur", "relax", "sommeil", "coton"] },
+  { id: "gelules", name: "Gélules & comprimés", group: "Beauté & santé", src: "/assets/food/gelules.svg", color: "#e85d04", keywords: ["gélule", "gelule", "comprimé", "vitamine", "mg", "magnésium", "zinc"] },
+  { id: "croquettes", name: "Croquettes", group: "Animalerie", src: "/assets/food/croquettes.svg", color: "#b5651d", keywords: ["croquette", "chien", "chat", "chiot", "chaton"] },
+  { id: "bulles", name: "Bulles & mousse", group: "Entretien", src: "/assets/food/bulles.svg", color: "#3a86ff", keywords: ["lessive", "vaisselle", "nettoyant", "mousse", "savon", "propre"] },
 ];
 
-export const LIBRARY_GROUPS = ["Saumon", "Nuggets", "Pizza", "Légumes", "Olives", "Fromage", "Basilic", "Citron", "Glace", "Viande", "Pain", "Plats"];
-
-export const HERO_BY_CATEGORY: Record<Category, string> = {
-  pizza: "pizza",
-  poisson: "saumon",
-  nuggets: "nuggets",
-  quiche: "quiche",
-  "plat-cuisine": "lasagnes",
-  glace: "glace",
-  fromage: "fromage",
-  boulangerie: "pain",
-  legumes: "legumes",
-  viande: "viande",
-  aperitif: "olives",
-};
-
-/** Garnitures d'accompagnement suggérées autour de la photo principale */
-export const GARNISH_BY_CATEGORY: Record<Category, string[]> = {
-  pizza: ["basilic", "tomate", "olives", "fromage"],
-  poisson: ["citron", "basilic", "legumes"],
-  nuggets: ["citron", "legumes", "tomate"],
-  quiche: ["fromage", "epinards", "tomate", "basilic"],
-  "plat-cuisine": ["basilic", "tomate", "fromage"],
-  glace: ["citron", "glace"],
-  fromage: ["pain", "olives", "basilic"],
-  boulangerie: ["fromage", "olives"],
-  legumes: ["basilic", "tomate", "champignon"],
-  viande: ["legumes", "champignon", "basilic"],
-  aperitif: ["citron", "basilic", "fromage"],
-};
+export const LIBRARY_GROUPS = ["Saumon", "Nuggets", "Pizza", "Légumes", "Olives", "Fromage", "Basilic", "Citron", "Glace", "Viande", "Pain", "Plats", "Épicerie", "Boissons", "Beauté & santé", "Animalerie", "Entretien"];
 
 export function libraryItem(id: string): LibraryItem | undefined {
   return LIBRARY.find((i) => i.id === id);

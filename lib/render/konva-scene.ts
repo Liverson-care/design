@@ -60,7 +60,14 @@ export function createNode(el: DesignElement, px: number, images: Map<string, HT
     case "image": {
       const img = images.get(el.src);
       if (!img) return new Konva.Rect({ ...common, x: el.x * px, y: el.y * px, width: el.w * px, height: el.h * px, fill: "#00000010" });
-      return new Konva.Image({ ...common, image: img, x: el.x * px, y: el.y * px, width: el.w * px, height: el.h * px });
+      // Ajustement « contain » : l'image n'est jamais étirée, elle est centrée dans sa zone.
+      const ar = (img.naturalWidth || img.width) / (img.naturalHeight || img.height) || 1;
+      let w = el.w, h = el.h;
+      if (Math.abs(ar - w / h) > 0.01) {
+        if (ar > w / h) h = w / ar;
+        else w = h * ar;
+      }
+      return new Konva.Image({ ...common, image: img, x: (el.x + (el.w - w) / 2) * px, y: (el.y + (el.h - h) / 2) * px, width: w * px, height: h * px });
     }
     case "text": {
       const text = el.uppercase ? el.text.toUpperCase() : el.text;

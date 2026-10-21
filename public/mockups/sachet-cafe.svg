@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="260mm" height="220mm" viewBox="0 0 260 220">
+  <title>Sachet café — tracé de découpe</title>
+  <g id="Decoupe" fill="none" stroke="#e5262b" stroke-width="0.25">
+    <path d="M0 0 L260 0 L260 220 L0 220 L0 0Z"/>
+  </g>
+  <g id="Rainage" fill="none" stroke="#14a44d" stroke-width="0.25" stroke-dasharray="3 2">
+    <line x1="130" y1="0" x2="130" y2="220"/>
+  </g>
+</svg>

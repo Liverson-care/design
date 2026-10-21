@@ -10,6 +10,8 @@ export type PanelRole = "front" | "back" | "left" | "right" | "top" | "bottom" |
 export interface Panel {
   id: string;
   role: PanelRole;
+  /** Zone logique sans pli (étiquettes, sachets) */
+  virtual?: boolean;
   x: number;
   y: number;
   w: number;
@@ -18,10 +20,16 @@ export interface Panel {
 
 export type DielineSource = "pdf" | "ai" | "svg" | "template";
 
+/** Type d'emballage choisi avant l'import du tracé */
+export type PackType = "etui" | "fourreau" | "etiquette" | "sachet" | "autre";
+export type LabelMode = "enveloppante" | "face";
+
 export interface Dieline {
   id: string;
   name: string;
   source: DielineSource;
+  packType: PackType;
+  labelMode?: LabelMode;
   widthMm: number;
   heightMm: number;
   /** Tracés de découpe (polylignes, courbes aplaties). Jamais modifiés par la génération. */
@@ -40,18 +48,8 @@ export interface Dieline {
 
 // ---------- Questionnaire ----------
 
-export type Category =
-  | "pizza"
-  | "poisson"
-  | "nuggets"
-  | "quiche"
-  | "plat-cuisine"
-  | "glace"
-  | "fromage"
-  | "boulangerie"
-  | "legumes"
-  | "viande"
-  | "aperitif";
+/** Clé de catégorie (voir lib/sectors.ts) */
+export type Category = string;
 
 export type Positioning = "premium" | "familial" | "discount" | "bio" | "terroir" | "sante";
 
@@ -63,13 +61,15 @@ export type StyleKey =
   | "moderne-gms"
   | "bio"
   | "luxe"
-  | "enfant";
+  | "enfant"
+  | "sante";
 
 export type Audience = "familles" | "enfants" | "jeunes-actifs" | "seniors" | "sportifs" | "gourmets";
 
 export type GmsReference = "aucune" | "picard" | "findus" | "marie" | "fleury-michon" | "carrefour";
 
 export interface Brief {
+  sector: import("@/lib/sectors").Sector;
   brandName: string;
   brandLogo?: string; // data URL
   productName: string;
@@ -85,6 +85,12 @@ export interface Brief {
   netWeight: string;
   benefit: string;
   storage: "surgele" | "frais" | "ambiant";
+  /** Packshot du produit fini (data URL, détouré si possible) */
+  packshot?: string;
+  /** Largeur / hauteur du packshot */
+  packshotAspect?: number;
+  /** Couleurs dominantes du packshot */
+  packshotColors?: string[];
   gmsReference: GmsReference;
 }
 
@@ -119,18 +125,8 @@ interface BaseElement {
   legalKey?: LegalKey;
 }
 
-export type LegalKey =
-  | "denomination"
-  | "netWeight"
-  | "ingredients"
-  | "allergens"
-  | "nutrition"
-  | "storage"
-  | "bestBefore"
-  | "address"
-  | "origin"
-  | "recycling"
-  | "barcode";
+/** Clé de mention réglementaire (voir lib/sectors.ts) */
+export type LegalKey = string;
 
 export interface TextElement extends BaseElement {
   kind: "text";

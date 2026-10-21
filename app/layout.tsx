@@ -5,9 +5,9 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "PackAI Designer — designs d'emballages alimentaires par IA", template: "%s · PackAI Designer" },
+  title: { default: "PackAI Designer — designs d'emballages par IA", template: "%s · PackAI Designer" },
   description:
-    "Importez votre tracé de découpe, répondez à 10 questions et obtenez 5 designs d'emballage prêts pour la grande distribution, en vue à plat et en 3D.",
+    "Étiquette, étui, fourreau ou sachet : importez votre tracé de découpe et votre packshot, obtenez 5 designs prêts pour le rayon, en vue à plat et en 3D — alimentaire, cosmétique, santé, entretien.",
 };
 
 export const viewport: Viewport = { themeColor: "#5a2ef5", width: "device-width", initialScale: 1 };

@@ -1,6 +1,6 @@
 # PackAI Designer
 
-Application web (Next.js 15) qui génère jusqu'à **5 designs d'emballages alimentaires** à partir d'un tracé de découpe (PDF, AI, SVG) et d'un questionnaire de 10 questions. Interface en français, pensée pour la grande distribution (GMS).
+Application web (Next.js 15) qui génère jusqu'à **5 designs d'emballages** à partir du type d'emballage (étiquette, étui 4 faces, fourreau, sachet, autre), d'un tracé de découpe (PDF, AI, SVG), d'un packshot du produit et d'un questionnaire. Tous secteurs : produits frais et surgelés, épicerie, boissons, cosmétique, hygiène, médicament (OTC), compléments alimentaires, animalerie, entretien. Interface en français.
 
 ## Démarrage
 
@@ -23,8 +23,8 @@ Scripts : `npm test` (détection de gabarit, générateur, contrôle GMS, gamme)
 
 ## Parcours
 
-1. **Gabarit** — import PDF / AI (compatible PDF) / SVG, ou gabarit standard. Détection automatique des dimensions, du contour de découpe, des plis, des panneaux (face, dos, côtés, dessus, dessous, rabats, patte de collage) et du volume monté. Attribution des panneaux corrigeable.
-2. **Questionnaire** — marque (texte ou logo), produit, catégorie, positionnement, couleurs, style (Premium, Minimaliste, Gourmet, Scandinave, Moderne GMS, Bio, Luxe, Enfant), cible, pays, inspirations (couleurs extraites automatiquement), contraintes ; plus poids net, bénéfice, conservation et **Mode GMS France**.
+1. **Emballage** — choix du type (étiquette enveloppante ou face simple, étui 4 faces, fourreau, sachet/doypack, autre forme), puis import du tracé PDF / AI (compatible PDF) / SVG, ou gabarit standard aux dimensions saisies. Détection automatique des dimensions, du contour, des plis et des faces ; pour une étiquette ou un sachet sans pli, découpage en zones logiques (face, mentions, informations) sans toucher au tracé.
+2. **Produit** — marque (texte ou logo), produit, **secteur et catégorie**, **packshot du produit fini** (détourage automatique d'un fond uni, recadrage, couleurs extraites, proportions conservées), positionnement, couleurs, style (Premium, Minimaliste, Gourmet, Scandinave, Moderne GMS, Bio, Luxe, Enfant, Santé / officine), cible, pays, inspirations, contraintes ; plus quantité nette, bénéfice, conservation (secteurs frais/surgelés) et **Mode GMS France** (secteurs alimentaires).
 3. **Propositions** — 5 designs qui varient palette, typographie, disposition, photo et éléments graphiques. Vue à plat, boîte 3D (Three.js), zoom, comparaison avant/après, score GMS.
 4. **Éditeur** (Konva) — texte, couleur, taille, position, rotation, photo, pictos, palette globale, annuler/rétablir. Découpes, plis, fonds techniques et zone de collage verrouillés.
 5. **Gamme complète** — à partir d'un design validé : déclinaisons (ex. Quiche Saumon, Épinards, Fromage, Thon) avec même grille, typographies, logo et couleur de marque ; code couleur et garniture par variante ; contrôle de cohérence.
@@ -35,6 +35,9 @@ Scripts : `npm test` (détection de gabarit, générateur, contrôle GMS, gamme)
 - **Aucun texte déformé** : les textes sont composés en vectoriel (jamais générés par l'IA d'image). Leur taille s'ajuste, l'échelle des lettres ne change jamais, y compris dans l'éditeur.
 - **Hiérarchie GMS** : logo → nom du produit → photo → bénéfice → infos secondaires, sur une grille avec marges de sécurité.
 - **Mode GMS France** (`lib/gms`) : codes visuels génériques de segments du rayon (surgelé premium, marques nationales, recettes traditionnelles, traiteur frais, MDD), appliqués sans reprise d'éléments protégés. Contrôles automatiques : lisibilité du nom à 2 m (hauteur de capitale ≥ distance / 250), hiérarchie du logo, contraste WCAG AA, mentions INCO 1169/2011 (dénomination et poids net dans le champ visuel principal, hauteur d'œil ≥ 1,2 mm, hauteur légale du poids net), Triman, marges de sécurité, part de la photo, cohérence de gamme.
+- **Mentions par secteur** (`lib/sectors.ts`) : INCO pour l'alimentaire, règlement cosmétique (fonction, INCI, PAO, lot, personne responsable), médicament (DCI et dosage en face, AMM, lot/EXP, excipients, mise en garde enfants, zone braille), compléments (dose journalière, avertissements), alimentation animale (espèce, constituants analytiques), entretien (pictogramme CLP en face, mentions de danger, UFI). Le contrôle vérifie la liste propre au secteur et l'emplacement des mentions de face.
+- **Lisibilité** : distance de lecture de 2 m pour les étuis et sachets, 1 m pour les petits formats (pot, flacon).
+- **3D selon le type** : boîte pour les étuis et fourreaux, sachet plat soudé, pot cylindrique habillé par l'étiquette.
 - **Couvercles** : un rabat solidaire du dos est pivoté de 180° sur le plat pour se lire à l'endroit une fois monté (vérifié en 3D).
 
 ## Structure
