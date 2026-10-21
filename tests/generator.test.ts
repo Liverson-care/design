@@ -24,18 +24,19 @@ const brief: Brief = {
   gmsReference: "aucune",
 };
 
-for (const spec of TEMPLATES) {
-  test(`5 designs distincts et conformes — ${spec.label}`, () => {
+const REFS = ["aucune", "picard", "findus", "marie", "fleury-michon", "carrefour"] as const;
+for (const spec of TEMPLATES) for (const gmsReference of REFS) {
+  test(`5 designs distincts et conformes — ${spec.label} · ${gmsReference}`, () => {
     const dieline = analyzeDieline(buildTemplate(spec));
     const before = JSON.stringify({ c: dieline.cutPaths, f: dieline.foldLines, p: dieline.panels });
-    const designs = generateDesigns(dieline, brief, 5);
+    const designs = generateDesigns(dieline, { ...brief, gmsReference }, 5);
     assert.equal(designs.length, 5);
     assert.equal(JSON.stringify({ c: dieline.cutPaths, f: dieline.foldLines, p: dieline.panels }), before, "gabarit inchangé");
     assert.equal(new Set(designs.map((d) => d.layout)).size, 5, "5 dispositions");
     assert.ok(new Set(designs.map((d) => d.palette.primary + d.palette.background)).size >= 4, "palettes variées");
     assert.ok(new Set(designs.map((d) => d.fonts.heading)).size >= 2, "typographies variées");
     for (const d of designs) {
-      const report = checkDesign(d, dieline, brief);
+      const report = checkDesign(d, dieline, { ...brief, gmsReference });
       const fails = report.items.filter((i) => i.status === "fail");
       assert.deepEqual(fails.map((f) => `${f.label}: ${f.detail}`), [], `${d.layout}`);
       assert.ok(report.score >= 70, `score ${report.score} (${d.layout})`);

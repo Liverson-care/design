@@ -9,6 +9,7 @@ import { referenceCodes, type ReferenceCodes } from "@/lib/gms/references";
 import { CATEGORY_COLORS, styleDef, type DecorKind, type StyleDef } from "./styles";
 import { benefitFor, claimFor, cookingIcons, denomination, NUTRITION_ROWS, originLabel, storageMention } from "./copy";
 import { fitText } from "./text-fit";
+import { backgroundUnder } from "@/lib/scene-geometry";
 
 export const LAYOUTS = ["hero-bas", "bandeau", "diagonale", "cadre", "plein-cadre"] as const;
 export type LayoutKey = (typeof LAYOUTS)[number];
@@ -201,6 +202,8 @@ export function generateDesign(dieline: Dieline, brief: Brief, variant: number, 
     FRONT_LAYOUTS[layout]({ ...ctxBase, p, m: Math.max(3, Math.min(p.w, p.h) * 0.06) });
   }
 
+  enforceContrast(b.elements);
+
   return {
     id: `ds_${hashString(`${Date.now()}${Math.random()}${variant}`).toString(36)}`,
     name: `Proposition ${variant + 1}`,
@@ -212,6 +215,17 @@ export function generateDesign(dieline: Dieline, brief: Brief, variant: number, 
     createdAt: Date.now(),
     usedAi: !!aiHero,
   };
+}
+
+/** Filet de sécurité : chaque texte est foncé ou éclairci jusqu'au contraste WCAG AA avec son fond réel. */
+function enforceContrast(elements: DesignElement[]) {
+  for (const el of elements) {
+    if (el.kind !== "text" || el.legalKey === "barcode") continue;
+    const bg = backgroundUnder({ elements }, el);
+    if (!bg || bg === "photo") continue;
+    const large = el.fontSize * 0.72 >= 4 || (el.fontWeight >= 700 && el.fontSize >= 4.9);
+    el.fill = ensureContrast(el.fill, bg, large ? 3.2 : 4.6);
+  }
 }
 
 export function hingedOnBack(panel: Panel, dieline: Dieline): boolean {
@@ -269,10 +283,10 @@ function addLogo(ctx: Ctx, x: number, y: number, w: number, h: number, color: st
   });
 }
 
-function addName(ctx: Ctx, x: number, y: number, w: number, h: number, color: string, align: "left" | "center" = "center") {
+function addName(ctx: Ctx, x: number, y: number, w: number, h: number, color: string, align: "left" | "center" = "center", maxLines = 2) {
   const { b, brief, fonts, style, p } = ctx;
   const upper = style.uppercaseName;
-  const fit = fitText(brief.productName || "Nom du produit", fonts.heading, w, h, { maxLines: 2, uppercase: upper, lineHeight: 1.02, weight: fonts.headingWeight });
+  const fit = fitText(brief.productName || "Nom du produit", fonts.heading, w, h, { maxLines, uppercase: upper, lineHeight: 1.02, weight: fonts.headingWeight });
   return b.text({
     x, y, w, h: fit.lines.length * fit.fontSize * 1.02 + 0.5, text: fit.lines.join("\n"), fontFamily: fonts.heading,
     fontSize: fit.fontSize, fontWeight: fonts.headingWeight, fill: color, align, uppercase: upper, lineHeight: 1.02,
@@ -491,9 +505,9 @@ const FRONT_LAYOUTS: Record<LayoutKey, (ctx: Ctx) => void> = {
     panelBg(ctx, pal.background);
     b.rect({ x: p.x + m * 0.6, y: p.y + m * 0.6, w: p.w - m * 1.2, h: p.h - m * 1.2, fill: "transparent", stroke: pal.primary, strokeWidth: 0.7, role: "decor", name: "Cadre", panelId: p.id });
     b.rect({ x: p.x + m * 0.9, y: p.y + m * 0.9, w: p.w - m * 1.8, h: p.h - m * 1.8, fill: "transparent", stroke: pal.primary, strokeWidth: 0.25, role: "decor", name: "Filet", panelId: p.id });
-    addLogo(ctx, p.x + m * 1.5, p.y + m * 1.6, p.w - 3 * m, p.h * 0.06, pal.primary, "center");
+    addLogo(ctx, p.x + m * 1.5, p.y + m * 1.6, p.w - 3 * m, p.h * 0.06, ensureContrast(pal.primary, pal.background, 4.5), "center");
     b.rect({ x: p.x + p.w * 0.42, y: p.y + m * 1.6 + p.h * 0.075, w: p.w * 0.16, h: 0.5, fill: pal.primary, role: "decor", name: "Ornement", panelId: p.id });
-    const name = addName(ctx, p.x + m * 1.5, p.y + p.h * 0.15, p.w - 3 * m, p.h * 0.16, ensureContrast(pal.text, pal.background, 4.5));
+    const name = addName(ctx, p.x + m * 1.5, p.y + p.h * 0.15, p.w - 3 * m, p.h * 0.17, ensureContrast(pal.text, pal.background, 4.5), "center", 3);
     addDenomination(ctx, p.x + m * 2, name.y + name.h + 1, p.w - 4 * m, ensureContrast(mix(pal.text, pal.primary, 0.3), pal.background));
     const plate = Math.min(p.w - 2.4 * m, p.h * 0.44);
     const plateY = p.y + p.h * 0.38;
