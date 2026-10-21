@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter><radialGradient id="p" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#f4b261"/><stop offset=".6" stop-color="#c8742a"/><stop offset="1" stop-color="#8a4512"/></radialGradient></defs>
+<ellipse cx="200" cy="310" rx="150" ry="24" fill="#000" opacity=".18" filter="url(#blur)"/>
+<path d="M90 230 C70 150 140 90 220 104 C300 118 330 190 300 240 C280 274 240 270 220 262 L180 300 C170 312 150 304 152 290 L170 254 C130 270 100 260 90 230Z" fill="url(#p)"/>
+<path d="M176 288 C160 310 132 316 122 302 C112 288 128 274 146 278 C150 262 168 256 176 270Z" fill="#f6ecd9"/>
+<g fill="#5b2a07" opacity=".35"><circle cx="160" cy="160" r="5"/><circle cx="220" cy="150" r="4"/><circle cx="250" cy="200" r="5"/><circle cx="190" cy="210" r="3"/></g>
+<ellipse cx="190" cy="140" rx="60" ry="20" fill="#fff" opacity=".3"/>
+</svg>

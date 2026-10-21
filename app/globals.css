@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  @apply bg-ink-50 text-ink-900 antialiased;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:scale-[.98];
+  }
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-white text-ink-800 hover:border-ink-300 hover:bg-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+  .card {
+    @apply rounded-2xl border border-ink-100 bg-white shadow-card;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 transition focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-ink-800;
+  }
+  .chip {
+    @apply inline-flex cursor-pointer select-none items-center gap-2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-700 transition hover:border-brand-300 hover:bg-brand-50;
+  }
+  .chip-active {
+    @apply border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-100;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+  .checker {
+    background-color: #f4f4f7;
+    background-image: linear-gradient(45deg, #eaeaf0 25%, transparent 25%), linear-gradient(-45deg, #eaeaf0 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eaeaf0 75%), linear-gradient(-45deg, transparent 75%, #eaeaf0 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  }
+  .skeleton {
+    @apply animate-shimmer rounded-xl;
+    background: linear-gradient(90deg, #eeeef2 0px, #f7f7f9 120px, #eeeef2 240px);
+    background-size: 800px 100%;
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #dcdce4;
+  border-radius: 8px;
+}

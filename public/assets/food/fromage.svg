@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter><linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe58a"/><stop offset="1" stop-color="#f2c14e"/></linearGradient><linearGradient id="side" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2b93a"/><stop offset="1" stop-color="#d49b1f"/></linearGradient><radialGradient id="hole" cx=".5" cy=".4" r=".6"><stop offset="0" stop-color="#c58a12"/><stop offset="1" stop-color="#e9b23c"/></radialGradient></defs>
+<ellipse cx="200" cy="320" rx="160" ry="24" fill="#000" opacity=".18" filter="url(#blur)"/>
+<path d="M60 200 L300 110 L350 170 L350 280 L60 300Z" fill="url(#side)"/>
+<path d="M60 200 L300 110 L350 170 L110 230Z" fill="url(#top)"/>
+<path d="M110 230 L350 170 L350 280 L110 310 Z" fill="#e8ad2e"/>
+<path d="M60 200 L110 230 L110 310 L60 300Z" fill="#c9901b"/>
+<g fill="url(#hole)"><ellipse cx="170" cy="260" rx="22" ry="16"/><ellipse cx="260" cy="236" rx="16" ry="12"/><ellipse cx="300" cy="270" rx="12" ry="9"/><ellipse cx="210" cy="290" rx="10" ry="7"/><ellipse cx="220" cy="170" rx="18" ry="7"/><ellipse cx="150" cy="200" rx="12" ry="5"/></g>
+<path d="M60 200 L300 110" stroke="#fff6c8" stroke-width="4" opacity=".7"/>
+</svg>

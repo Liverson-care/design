@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="495mm" height="140mm" viewBox="0 0 495 140">
+  <title>Fourreau plat cuisiné — tracé de découpe</title>
+  <g id="Decoupe" fill="none" stroke="#e5262b" stroke-width="0.25">
+    <path d="M0 6 L15 0 L495 0 L495 140 L15 140 L0 134 L0 6Z"/>
+  </g>
+  <g id="Rainage" fill="none" stroke="#14a44d" stroke-width="0.25" stroke-dasharray="3 2">
+    <line x1="15" y1="0" x2="15" y2="140"/>
+    <line x1="205" y1="0" x2="205" y2="140"/>
+    <line x1="255" y1="0" x2="255" y2="140"/>
+    <line x1="445" y1="0" x2="445" y2="140"/>
+  </g>
+</svg>
