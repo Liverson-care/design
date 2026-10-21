@@ -60,7 +60,7 @@ export function RangeBuilder() {
   return (
     <div className="mx-auto max-w-[1400px] animate-fade-up">
       <header className="mb-5">
-        <p className="text-sm font-semibold text-brand-600">Étape 5 · Bonus</p>
+        <p className="text-sm font-semibold text-brand-600">Étape 6 · Bonus</p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight md:text-3xl">Créer une gamme complète</h1>
         <p className="mt-1 text-ink-500">Même identité visuelle, un code couleur et une garniture par variante. Idéal pour former un bloc marque en rayon.</p>
       </header>

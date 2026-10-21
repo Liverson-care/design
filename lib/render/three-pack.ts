@@ -1,7 +1,25 @@
 "use client";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { DesignScene, Dieline, Panel, PanelRole } from "@/lib/types";
 import { hingedOnBack } from "@/lib/generator/generate";
+import { paperGrain } from "./procedural";
+
+export type Finish = "mat" | "satine" | "brillant";
+export type Substrate = "carton" | "kraft" | "verre" | "plastique";
+
+export interface PackRenderOptions {
+  /** Rendu « fabrication » : arêtes arrondies, grain du carton, vernis */
+  realistic?: boolean;
+  finish?: Finish;
+  substrate?: Substrate;
+}
+
+const FINISH: Record<Finish, { roughness: number; clearcoat: number; clearcoatRoughness: number }> = {
+  mat: { roughness: 0.78, clearcoat: 0, clearcoatRoughness: 1 },
+  satine: { roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.45 },
+  brillant: { roughness: 0.38, clearcoat: 0.9, clearcoatRoughness: 0.08 },
+};
 
 export interface PackModel {
   object: THREE.Object3D;
@@ -26,7 +44,20 @@ function crop(src: HTMLCanvasElement, p: { x: number; y: number; w: number; h: n
  * Construit le volume monté selon le type d'emballage :
  * étui / fourreau / autre → boîte ; sachet → boîte plate soudée ; étiquette → pot cylindrique habillé.
  */
-export function buildPackModel(scene: DesignScene, dieline: Dieline, flat: HTMLCanvasElement, px: number, maxAniso: number): PackModel {
+export function buildPackModel(scene: DesignScene, dieline: Dieline, flat: HTMLCanvasElement, px: number, maxAniso: number, opts: PackRenderOptions = {}): PackModel {
+  const real = !!opts.realistic;
+  const fin = FINISH[opts.finish ?? "satine"];
+  const grain = real ? paperGrain() : null;
+  if (grain) grain.repeat.set(6, 6);
+  /** Matériau imprimé : papier / carton avec relief et vernis */
+  const printed = (map: THREE.Texture, extra: Partial<THREE.MeshPhysicalMaterialParameters> = {}) =>
+    real
+      ? new THREE.MeshPhysicalMaterial({
+          map, roughness: fin.roughness, clearcoat: fin.clearcoat, clearcoatRoughness: fin.clearcoatRoughness,
+          bumpMap: grain ?? undefined, bumpScale: opts.substrate === "kraft" ? 0.6 : 0.25, envMapIntensity: 0.9,
+          color: opts.substrate === "kraft" ? new THREE.Color("#e6d4b4") : new THREE.Color("#ffffff"), ...extra,
+        })
+      : new THREE.MeshStandardMaterial({ map, roughness: 0.5, envMapIntensity: 0.6, ...(extra as THREE.MeshStandardMaterialParameters) });
   const textures: THREE.Texture[] = [];
   const materials: THREE.Material[] = [];
   const geometries: THREE.BufferGeometry[] = [];
@@ -39,7 +70,7 @@ export function buildPackModel(scene: DesignScene, dieline: Dieline, flat: HTMLC
   };
   const mat = <M extends THREE.Material>(m: M) => (materials.push(m), m);
   const geo = <G extends THREE.BufferGeometry>(g: G) => (geometries.push(g), g);
-  const dispose = () => { textures.forEach((t) => t.dispose()); materials.forEach((m) => m.dispose()); geometries.forEach((g) => g.dispose()); };
+  const dispose = () => { textures.forEach((t) => t.dispose()); materials.forEach((m) => m.dispose()); geometries.forEach((g) => g.dispose()); grain?.dispose(); };
   const group = new THREE.Group();
 
   if (dieline.packType === "etiquette") {
@@ -49,12 +80,24 @@ export function buildPackModel(scene: DesignScene, dieline: Dieline, flat: HTMLC
     const front = dieline.panels.find((p) => p.role === "front");
     const thetaLength = dieline.labelMode === "enveloppante" ? (2 * Math.PI) / 1.02 : dieline.widthMm / R;
     const frontU = front ? (front.x + front.w / 2) / dieline.widthMm : 0.5;
-    const body = new THREE.Mesh(geo(new THREE.CylinderGeometry(R, R * 0.98, jarH, 96)), mat(new THREE.MeshPhysicalMaterial({ color: 0xf4f2ee, roughness: 0.25, clearcoat: 0.6 })));
+    const glass = real && opts.substrate === "verre";
+    const body = new THREE.Mesh(
+      geo(new THREE.CylinderGeometry(R, R * 0.98, jarH, 96)),
+      mat(glass
+        ? new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, transmission: 1, thickness: 3, ior: 1.5, clearcoat: 1, transparent: true })
+        : new THREE.MeshPhysicalMaterial({ color: 0xf4f2ee, roughness: 0.25, clearcoat: 0.6 })),
+    );
     body.castShadow = true;
+    if (glass) {
+      // Contenu visible à travers le verre
+      const content = new THREE.Mesh(geo(new THREE.CylinderGeometry(R * 0.93, R * 0.92, jarH * 0.86, 64)), mat(new THREE.MeshStandardMaterial({ color: new THREE.Color(scene.palette.accent).lerp(new THREE.Color(scene.palette.primary), 0.35), roughness: 0.6 })));
+      content.position.y = -jarH * 0.06;
+      group.add(content);
+    }
     const labelTex = tex(crop(flat, { x: 0, y: 0, w: dieline.widthMm, h: dieline.heightMm }, px));
     const label = new THREE.Mesh(
       geo(new THREE.CylinderGeometry(R * 1.004, R * 1.004, labelH, 128, 1, true, -frontU * thetaLength, thetaLength)),
-      mat(new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.45, side: THREE.DoubleSide })),
+      mat(printed(labelTex, { side: THREE.DoubleSide, color: new THREE.Color(opts.substrate === "kraft" ? "#e6d4b4" : "#ffffff") })),
     );
     label.position.y = -jarH * 0.04;
     const lidH = jarH * 0.14;
@@ -74,11 +117,15 @@ export function buildPackModel(scene: DesignScene, dieline: Dieline, flat: HTMLC
       return mat(new THREE.MeshStandardMaterial({ color, roughness: 0.35 }));
     }
     const flip = (role === "top" || role === "bottom") && hingedOnBack(panel, dieline);
-    return mat(new THREE.MeshStandardMaterial({ map: tex(crop(flat, panel, px, flip)), roughness: dieline.packType === "sachet" ? 0.3 : 0.5, envMapIntensity: 0.6 }));
+    return mat(printed(tex(crop(flat, panel, px, flip)), dieline.packType === "sachet" ? { roughness: Math.min(fin.roughness, 0.35), clearcoat: Math.max(fin.clearcoat, 0.6) } : {}));
   };
-  const box = new THREE.Mesh(geo(new THREE.BoxGeometry(L, H, D)), (["right", "left", "top", "bottom", "front", "back"] as PanelRole[]).map(faceMaterial));
+  // Arêtes arrondies : rainage du carton (≈ 1 mm), ou sachet « coussin » gonflé
+  const radius = dieline.packType === "sachet" ? Math.min(D * 0.48, L * 0.2) : Math.min(1.2, D * 0.04, L * 0.02);
+  const shape = real && radius > 0.2 ? new RoundedBoxGeometry(L, H, D, 4, radius) : new THREE.BoxGeometry(L, H, D);
+  const box = new THREE.Mesh(geo(shape), (["right", "left", "top", "bottom", "front", "back"] as PanelRole[]).map(faceMaterial));
   box.castShadow = true;
-  box.add(new THREE.LineSegments(geo(new THREE.EdgesGeometry(box.geometry)), mat(new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 }))));
+  box.receiveShadow = real;
+  if (!real) box.add(new THREE.LineSegments(geo(new THREE.EdgesGeometry(box.geometry)), mat(new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 }))));
   group.add(box);
   if (dieline.packType === "sachet") {
     // Soudure haute du sachet

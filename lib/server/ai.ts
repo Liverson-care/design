@@ -79,3 +79,40 @@ function dataUrlToBlob(src: string): Blob | null {
   const bytes = m[2] ? Buffer.from(m[3], "base64") : Buffer.from(decodeURIComponent(m[3]));
   return new Blob([bytes], { type: m[1] });
 }
+
+const SCENE_PROMPT: Record<string, string> = {
+  "studio-clair": "posé sur un fond de studio blanc cassé, éclairage photo professionnel doux, ombre portée naturelle",
+  "studio-sombre": "sur un fond de studio sombre, éclairage dramatique avec contre-jour, reflets subtils",
+  "table-bois": "posé sur une table en bois dans une cuisine lumineuse, arrière-plan flou, lumière naturelle de fenêtre",
+  rayon: "en rayon de supermarché sur une tablette métallique, plusieurs exemplaires alignés, éclairage de magasin",
+};
+
+/**
+ * Transforme le rendu 3D fidèle de l'emballage en photographie produit photoréaliste.
+ * Le prompt impose de conserver à l'identique l'impression (textes, logo, couleurs, proportions).
+ */
+export async function photorealPackshot(render: string, backdrop: string, finish: string, substrate: string): Promise<string | undefined> {
+  if (!aiEnabled()) return undefined;
+  const blob = dataUrlToBlob(render);
+  if (!blob) return undefined;
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1");
+  form.append("prompt", [
+    "Photographie produit professionnelle, photoréaliste, de l'emballage montré dans l'image : même forme, mêmes proportions, même cadrage.",
+    `Conserve exactement l'impression : textes, logo, couleurs, photo et mise en page identiques, sans rien ajouter ni retirer. Matière : ${substrate}, finition ${finish}.`,
+    `Mise en scène : ${SCENE_PROMPT[backdrop] ?? SCENE_PROMPT["studio-clair"]}.`,
+    "Rendu de catalogue haut de gamme : micro-relief du carton, arêtes nettes, reflets réalistes du vernis, profondeur de champ légère.",
+  ].join(" "));
+  form.append("size", "1536x1024");
+  form.append("quality", "high");
+  form.append("input_fidelity", "high");
+  form.append("image[]", blob, "rendu.png");
+  const res = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: form });
+  if (!res.ok) {
+    console.error("OpenAI rendu photo :", res.status, await res.text().catch(() => ""));
+    return undefined;
+  }
+  const json = (await res.json()) as { data?: { b64_json?: string }[] };
+  const b64 = json.data?.[0]?.b64_json;
+  return b64 ? `data:image/png;base64,${b64}` : undefined;
+}

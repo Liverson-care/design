@@ -8,6 +8,7 @@ import { StepBrief } from "./StepBrief";
 import { StepResults } from "./StepResults";
 import { Editor } from "./Editor";
 import { RangeBuilder } from "./RangeBuilder";
+import { FinalRender } from "./FinalRender";
 import { Generating } from "./Generating";
 import { IconCheck, IconPlus, IconSave } from "@/components/ui/icons";
 
@@ -25,6 +26,7 @@ export function Studio() {
     return !!s.validatedId;
   };
   const done = (k: Step) => (k === "upload" ? !!s.dieline : k === "brief" ? s.designs.length > 0 : k === "results" ? !!s.validatedId : k === "range" ? !!s.range : false);
+
 
   const generate = async () => {
     const { dieline, brief, usage } = useStudio.getState();
@@ -117,6 +119,7 @@ export function Studio() {
           {s.step === "brief" && <StepBrief onGenerate={generate} />}
           {s.step === "results" && <StepResults onGenerate={generate} />}
           {s.step === "editor" && <Editor />}
+          {s.step === "rendu" && <FinalRender />}
           {s.step === "range" && <RangeBuilder />}
         </div>
       </div>

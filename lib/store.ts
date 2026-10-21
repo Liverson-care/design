@@ -6,13 +6,14 @@ import type { CheckItem, GmsReport } from "@/lib/gms/check";
 import { checkDesign } from "@/lib/gms/check";
 import { idbStorage } from "./idb-storage";
 
-export type Step = "upload" | "brief" | "results" | "editor" | "range";
+export type Step = "upload" | "brief" | "results" | "editor" | "rendu" | "range";
 
 export const STEPS: { key: Step; label: string; hint: string }[] = [
   { key: "upload", label: "Emballage", hint: "Type et tracé de découpe" },
   { key: "brief", label: "Produit", hint: "Secteur, packshot, style" },
   { key: "results", label: "Propositions", hint: "5 designs IA" },
   { key: "editor", label: "Éditeur", hint: "Personnaliser" },
+  { key: "rendu", label: "Rendu final", hint: "Emballage réaliste" },
   { key: "range", label: "Gamme", hint: "Déclinaisons" },
 ];
 

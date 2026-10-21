@@ -91,7 +91,10 @@ export function StepResults({ onGenerate }: { onGenerate: () => void }) {
             <span><b className="text-ink-800">Disposition :</b> {LAYOUT_LABELS[current.layout as LayoutKey] ?? current.layout}</span>
             <span className="flex items-center gap-1"><IconLayers size={14} /> {current.elements.length} éléments · découpes & plis verrouillés</span>
             {validatedId === current.id && (
-              <button className="btn-primary btn-sm ml-auto" onClick={() => setStep("range")}><IconGrid size={14} /> Créer une gamme complète</button>
+              <span className="ml-auto flex gap-2">
+                <button className="btn-primary btn-sm" onClick={() => setStep("rendu")}><IconBox size={14} /> Créer l'emballage réel</button>
+                <button className="btn-secondary btn-sm" onClick={() => setStep("range")}><IconGrid size={14} /> Créer une gamme complète</button>
+              </span>
             )}
           </div>
         </div>
