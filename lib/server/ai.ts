@@ -30,19 +30,31 @@ export async function generateProductPhoto(brief: Brief, style: StyleKey, varian
     "Produit seul, détouré sur fond transparent, sans aucun texte, sans logo, sans emballage, sans main.",
     "Qualité packshot pour emballage de grande distribution.",
   ].join(" ");
-  const res = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1",
+  const model = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1";
+  const refs = [...(brief.productRefs ?? []).slice(0, 4), ...(brief.inspirations ?? []).slice(0, 2)];
+  let res: Response;
+  if (refs.length) {
+    // Avec des photos de référence : endpoint « edits », qui accepte plusieurs images d'entrée.
+    const form = new FormData();
+    form.append("model", model);
+    form.append("prompt", [
       prompt,
-      size: "1024x1024",
-      background: "transparent",
-      output_format: "png",
-      quality: "medium",
-      n: 1,
-    }),
-  });
+      brief.productRefs?.length ? `Les ${Math.min(4, brief.productRefs.length)} premières images montrent le produit fini réel : reproduis fidèlement sa forme, sa couleur, sa texture et ses ingrédients.` : "",
+      brief.inspirations?.length ? "Les dernières images sont des emballages que le client aime : inspire-toi uniquement de leur lumière et de leur ambiance, sans reprendre de texte ni de logo." : "",
+    ].filter(Boolean).join(" "));
+    form.append("size", "1024x1024");
+    form.append("background", "transparent");
+    form.append("output_format", "png");
+    form.append("quality", "medium");
+    refs.forEach((src, i) => { const blob = dataUrlToBlob(src); if (blob) form.append("image[]", blob, `ref-${i}.png`); });
+    res = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: form });
+  } else {
+    res = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({ model, prompt, size: "1024x1024", background: "transparent", output_format: "png", quality: "medium", n: 1 }),
+    });
+  }
   if (!res.ok) {
     console.error("OpenAI Images :", res.status, await res.text().catch(() => ""));
     return undefined;
@@ -59,4 +71,11 @@ export async function generateLibraryPhoto(name: string): Promise<string | undef
     "gourmet",
     0,
   );
+}
+
+function dataUrlToBlob(src: string): Blob | null {
+  const m = src.match(/^data:([^;,]+)(;base64)?,(.*)$/s);
+  if (!m) return null;
+  const bytes = m[2] ? Buffer.from(m[3], "base64") : Buffer.from(decodeURIComponent(m[3]));
+  return new Blob([bytes], { type: m[1] });
 }

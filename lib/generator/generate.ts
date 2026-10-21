@@ -2,7 +2,7 @@ import type {
   Brief, DesignElement, DesignScene, Dieline, EllipseElement, FontPair, ImageElement, LegalKey,
   Palette, Panel, PathElement, RectElement, StyleKey, TextElement,
 } from "@/lib/types";
-import { bestTextOn, contrastRatio, darken, ensureContrast, hashString, lighten, mix } from "@/lib/color";
+import { bestTextOn, contrastRatio, darken, ensureContrast, hashString, lighten, luminance, mix } from "@/lib/color";
 import { libraryItem, type LibraryItem } from "@/lib/library";
 import { categoryDef, sectorDef, toBraille, type SectorDef } from "@/lib/sectors";
 import { icon } from "@/lib/icons";
@@ -76,8 +76,20 @@ export function variantPlan(brief: Brief, variant: number) {
 
 export function buildPalette(style: StyleDef, brief: Brief, index: number, variant: number, ref: ReferenceCodes): Palette {
   const base = { ...style.palettes[index % style.palettes.length] };
-  // Couleurs choisies, sinon celles du packshot : le design s'accorde au produit réel.
-  const user = (brief.colors.length ? brief.colors : brief.packshotColors ?? []).filter(Boolean);
+  const charter = brief.charter?.enabled ? brief.charter : undefined;
+  if (charter) {
+    // Charte graphique : couleurs imposées à l'identique sur les 5 propositions.
+    base.primary = charter.primary;
+    base.secondary = charter.secondary || lighten(charter.primary, 0.8);
+    base.accent = charter.accent || charter.secondary || categoryDef(brief.category).color;
+    base.background = charter.background || "#ffffff";
+    base.surface = luminance(base.background) > 0.5 ? mix(base.background, charter.primary, 0.06) : mix(base.background, "#ffffff", 0.08);
+    base.text = ensureContrast(luminance(base.background) > 0.5 ? darken(charter.primary, 0.6) : "#ffffff", base.background, 7);
+    return { ...base, name: "Charte graphique", onPrimary: bestTextOn(base.primary) };
+  }
+  // Couleurs choisies, sinon celles des designs d'inspiration, sinon celles du packshot : le design s'accorde au produit réel.
+  const insp = brief.inspirationProfile?.useColors ? brief.inspirationProfile.colors : [];
+  const user = (brief.colors.length ? brief.colors : insp.length ? insp : brief.packshotColors ?? []).filter(Boolean);
   if (user.length) {
     base.primary = user[variant % user.length];
     base.accent = user.length > 1 ? user[(variant + 1) % user.length] : categoryDef(brief.category).color;
@@ -87,6 +99,19 @@ export function buildPalette(style: StyleDef, brief: Brief, index: number, varia
     base.background = "#ffffff";
     base.surface = lighten(base.primary, 0.92);
     base.text = darken(base.primary, 0.55);
+  }
+  // Ambiance des inspirations : fonds sombres ou clairs selon les designs aimés
+  const prof = brief.inspirationProfile;
+  if (prof?.useColors && !brief.colors.length) {
+    if (prof.lightness < 0.35 && luminance(base.background) > 0.4) {
+      base.background = darken(base.primary, 0.62);
+      base.surface = darken(base.primary, 0.5);
+      base.text = "#f7f5f0";
+    } else if (prof.lightness > 0.7 && luminance(base.background) < 0.3) {
+      base.background = "#ffffff";
+      base.surface = lighten(base.primary, 0.92);
+      base.text = darken(base.primary, 0.6);
+    }
   }
   if (/fond\s+(tr[eè]s\s+)?(blanc|clair)/i.test(brief.constraints)) {
     base.background = "#ffffff";
@@ -148,7 +173,10 @@ export function generateDesign(dieline: Dieline, brief: Brief, variant: number, 
   const style = styleDef(plan.styleKey);
   const layout = opts.forceLayout ?? plan.layout;
   const pal = buildPalette(style, brief, plan.paletteIndex, variant, plan.ref);
-  const fonts = style.fonts[plan.fontIndex % style.fonts.length];
+  const charter = brief.charter?.enabled ? brief.charter : undefined;
+  const fonts = charter
+    ? { heading: charter.headingFont, headingWeight: 700, body: charter.bodyFont, bodyWeight: 400 }
+    : style.fonts[plan.fontIndex % style.fonts.length];
   const rand = rng(hashString(`${opts.seed ?? ""}${brief.productName}|${variant}`));
   const b = new SceneBuilder();
 
@@ -220,12 +248,13 @@ export function generateDesign(dieline: Dieline, brief: Brief, variant: number, 
 
   return {
     id: `ds_${hashString(`${Date.now()}${Math.random()}${variant}`).toString(36)}`,
-    name: `Proposition ${variant + 1}`,
+    name: charter ? `Charte · proposition ${variant + 1}` : `Proposition ${variant + 1}`,
     style: style.key,
     layout,
     palette: pal,
     fonts,
     elements: b.elements,
+    fontFaces: charter?.customFonts.length ? charter.customFonts : undefined,
     createdAt: Date.now(),
     usedAi: !!aiHero,
   };
@@ -265,6 +294,12 @@ function rotatePanelContent(elements: DesignElement[], panel: Panel) {
   }
 }
 
+/** Logo importé obligatoire : toujours ; facultatif : une proposition sur deux, l'autre reçoit un logotype typographique */
+function logoImageWanted(ctx: Ctx): boolean {
+  if (!ctx.brief.brandLogo) return false;
+  return ctx.brief.logoMode === "libre" ? ctx.variant % 2 === 0 : true;
+}
+
 // ---------------------------------------------------------------- éléments communs
 
 function panelBg(ctx: Ctx, fill: string, name = "Fond de face") {
@@ -274,10 +309,22 @@ function panelBg(ctx: Ctx, fill: string, name = "Fond de face") {
 
 function addLogo(ctx: Ctx, x: number, y: number, w: number, h: number, color: string, align: "left" | "center" = "center", cartouche?: string) {
   const { b, brief, fonts, p } = ctx;
-  if (brief.brandLogo) {
-    const size = Math.min(w, h * 2.2);
-    const lx = align === "center" ? x + (w - size) / 2 : x;
-    return b.image({ x: lx, y, w: size, h, src: brief.brandLogo, role: "logo", name: "Logo", panelId: p.id });
+  if (logoImageWanted(ctx)) {
+    // Logo officiel : proportions d'origine, jamais recoloré ni redessiné
+    const ar = brief.brandLogoAspect ?? 2.2;
+    let lh = h, lw = h * ar;
+    if (lw > w) { lw = w; lh = w / ar; }
+    const lx = align === "center" ? x + (w - lw) / 2 : x;
+    const ly = y + (h - lh) / 2;
+    const mandatory = brief.logoMode !== "libre";
+    // Zone de protection claire si le fond sous le logo est sombre (lisibilité des logos en couleurs)
+    const probe = { id: "probe", kind: "text", name: "", role: "logo", x: lx, y: ly, w: lw, h: lh, rotation: 0, text: "", fontFamily: "", fontSize: 1, fontWeight: 400, fill: "#000", align: "left" } as TextElement;
+    const under = backgroundUnder({ elements: [...b.elements, probe] }, probe);
+    if (typeof under === "string" && luminance(under) < 0.45) {
+      const pad = Math.min(lh * 0.28, 4);
+      b.rect({ x: lx - pad, y: ly - pad, w: lw + 2 * pad, h: lh + 2 * pad, fill: "#ffffff", radius: Math.min(4, pad), role: "logo", name: "Zone de protection du logo", panelId: p.id });
+    }
+    return b.image({ x: lx, y: ly, w: lw, h: lh, src: brief.brandLogo!, role: "logo", name: mandatory ? "Logo officiel" : "Logo", panelId: p.id, mandatory });
   }
   const name = brief.brandName || "Votre marque";
   if (cartouche) {
@@ -786,7 +833,17 @@ function sidePanel(ctx: Ctx, isRight: boolean) {
   const thick = p.w - 2 * m;
   const nameFit = fitText(brief.productName || "Nom du produit", fonts.heading, len * 0.62, thick * 0.55, { maxLines: 1, uppercase: ctx.style.uppercaseName, weight: fonts.headingWeight });
   const brandFit = fitText((brief.brandName || "Marque").toUpperCase(), fonts.heading, len * 0.3, thick * 0.35, { maxLines: 1, uppercase: true, weight: 800 });
-  b.text({ x: p.x + (p.w - brandFit.fontSize) / 2, y: p.y + p.h - m, w: len * 0.32, h: brandFit.fontSize * 1.1, rotation: -90, text: (brief.brandName || "Marque").toUpperCase(), fontFamily: fonts.heading, fontSize: brandFit.fontSize, fontWeight: 800, fill: fg, role: "logo", name: "Logo (côté)", panelId: p.id, letterSpacing: brandFit.fontSize * 0.05 });
+  if (logoImageWanted(ctx)) {
+    // Logo officiel pivoté (lecture de bas en haut), proportions conservées, sur pastille claire
+    const ar = brief.brandLogoAspect ?? 2.2;
+    let lw = len * 0.3, lh = lw / ar;
+    if (lh > thick * 0.6) { lh = thick * 0.6; lw = lh * ar; }
+    const x0 = p.x + (p.w - lh) / 2, y0 = p.y + p.h - m;
+    b.rect({ x: x0 - 1.5, y: y0 + 1.5, w: lw + 3, h: lh + 3, rotation: -90, fill: "#ffffff", radius: 1.5, role: "logo", name: "Zone de protection du logo (côté)", panelId: p.id });
+    b.image({ x: x0, y: y0, w: lw, h: lh, rotation: -90, src: brief.brandLogo!, role: "logo", name: brief.logoMode === "libre" ? "Logo (côté)" : "Logo officiel (côté)", panelId: p.id, mandatory: brief.logoMode !== "libre" });
+  } else {
+    b.text({ x: p.x + (p.w - brandFit.fontSize) / 2, y: p.y + p.h - m, w: len * 0.32, h: brandFit.fontSize * 1.1, rotation: -90, text: (brief.brandName || "Marque").toUpperCase(), fontFamily: fonts.heading, fontSize: brandFit.fontSize, fontWeight: 800, fill: fg, role: "logo", name: "Logo (côté)", panelId: p.id, letterSpacing: brandFit.fontSize * 0.05 });
+  }
   b.text({ x: p.x + (p.w - nameFit.fontSize) / 2, y: p.y + p.h - m - len * 0.36, w: len * 0.64, h: nameFit.fontSize * 1.1, rotation: -90, text: nameFit.lines[0], fontFamily: fonts.heading, fontSize: nameFit.fontSize, fontWeight: fonts.headingWeight, fill: fg, uppercase: ctx.style.uppercaseName, role: "productName", name: "Nom du produit (côté)", panelId: p.id });
   if (isRight) {
     const s = Math.max(2.5, Math.min(2.8, p.w * 0.05));

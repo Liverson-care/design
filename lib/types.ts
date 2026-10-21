@@ -72,6 +72,10 @@ export interface Brief {
   sector: import("@/lib/sectors").Sector;
   brandName: string;
   brandLogo?: string; // data URL
+  /** Largeur / hauteur du logo importé */
+  brandLogoAspect?: number;
+  /** obligatoire : logo utilisé tel quel partout ; libre : l'IA peut proposer un logotype typographique */
+  logoMode?: "obligatoire" | "libre";
   productName: string;
   category: Category;
   positioning: Positioning;
@@ -91,7 +95,39 @@ export interface Brief {
   packshotAspect?: number;
   /** Couleurs dominantes du packshot */
   packshotColors?: string[];
+  /** Photos de référence du produit fini, transmises à l'IA (data URL) */
+  productRefs?: string[];
+  /** Analyse des designs d'inspiration (couleurs, ambiance) */
+  inspirationProfile?: InspirationProfile;
+  /** Charte graphique à respecter */
+  charter?: Charter;
   gmsReference: GmsReference;
+}
+
+export interface InspirationProfile {
+  colors: string[];
+  /** Luminosité moyenne 0-1 */
+  lightness: number;
+  /** Saturation moyenne 0-1 */
+  saturation: number;
+  /** Utiliser ces couleurs pour la palette */
+  useColors: boolean;
+}
+
+export interface FontFaceAsset {
+  family: string;
+  src: string; // data URL du fichier de police
+}
+
+export interface Charter {
+  enabled: boolean;
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  headingFont: string;
+  bodyFont: string;
+  customFonts: FontFaceAsset[];
 }
 
 // ---------- Scène de design ----------
@@ -121,6 +157,8 @@ interface BaseElement {
   /** Élément non sélectionnable dans l'éditeur (fonds techniques) */
   locked?: boolean;
   panelId?: string;
+  /** Élément imposé par le client (logo officiel) : ni supprimé, ni remplacé, ni déformé */
+  mandatory?: boolean;
   /** Mention réglementaire portée par l'élément (contrôle GMS / INCO) */
   legalKey?: LegalKey;
 }
@@ -208,6 +246,8 @@ export interface DesignScene {
   /** Variante de gamme (ex. « Saumon ») */
   variantLabel?: string;
   rangeId?: string;
+  /** Polices de la charte importées par l'utilisateur */
+  fontFaces?: FontFaceAsset[];
   createdAt: number;
   usedAi?: boolean;
 }

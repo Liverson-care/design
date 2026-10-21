@@ -6,6 +6,7 @@ import { STYLES } from "@/lib/generator/styles";
 import { GMS_REFERENCES } from "@/lib/gms/references";
 import { SECTORS, categoryDef, sectorDef, type Sector } from "@/lib/sectors";
 import { dominantColors, fileToDataUrl, preparePackshot } from "@/lib/image";
+import { CharterBlock, ImageStrip, InspirationBlock } from "./BriefVisuals";
 import { IconCheck, IconImage, IconSparkles, IconStore, IconX } from "@/components/ui/icons";
 
 const POSITIONINGS: { key: Positioning; label: string }[] = [
@@ -65,19 +66,47 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
       </header>
 
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (valid) onGenerate(); }}>
-        <Q n={1} title="Nom de la marque" hint="Texte ou logo (PNG/SVG)">
+        <Q n={1} title="Nom de la marque" hint="Texte ou logo (PNG, SVG, JPEG)">
           <div className="flex flex-col gap-3 sm:flex-row">
             <input className="input" placeholder="ex. Maison Dorée" value={brief.brandName} onChange={(e) => updateBrief({ brandName: e.target.value })} required aria-label="Nom de la marque" />
             <label className="btn-secondary shrink-0 cursor-pointer">
-              <IconImage size={16} /> {brief.brandLogo ? "Changer le logo" : "Importer un logo"}
-              <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) updateBrief({ brandLogo: await fileToDataUrl(f, 800) }); }} />
+              <IconImage size={16} /> {brief.brandLogo ? "Changer le logo" : "Importer le logo"}
+              <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="hidden" onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                if (f.type === "image/svg+xml") {
+                  const src = await fileToDataUrl(f);
+                  const ar = await new Promise<number>((res) => { const im = new Image(); im.onload = () => res(im.naturalWidth && im.naturalHeight ? im.naturalWidth / im.naturalHeight : 2); im.onerror = () => res(2); im.src = src; });
+                  updateBrief({ brandLogo: src, brandLogoAspect: ar, logoMode: brief.logoMode ?? "obligatoire" });
+                } else {
+                  // Fond blanc uni retiré, recadrage au plus près : le logo garde ses proportions exactes
+                  const logo = await preparePackshot(f, true);
+                  updateBrief({ brandLogo: logo.src, brandLogoAspect: logo.aspect, logoMode: brief.logoMode ?? "obligatoire" });
+                }
+              }} />
             </label>
           </div>
           {brief.brandLogo && (
-            <div className="mt-3 flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={brief.brandLogo} alt="Logo importé" className="checker h-14 w-28 rounded-lg object-contain p-1" />
-              <button type="button" className="btn-ghost btn-sm" onClick={() => updateBrief({ brandLogo: undefined })}><IconX size={14} /> Retirer</button>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={brief.brandLogo} alt="Logo importé" className="checker h-16 w-32 rounded-lg object-contain p-1" />
+                <button type="button" className="btn-ghost btn-sm" onClick={() => updateBrief({ brandLogo: undefined, brandLogoAspect: undefined, logoMode: undefined })}><IconX size={14} /> Retirer</button>
+              </div>
+              <div className="grid flex-1 gap-2" role="radiogroup" aria-label="Utilisation du logo">
+                {([
+                  ["obligatoire", "Logo obligatoire", "Utilisé tel quel sur toutes les propositions et toutes les faces, proportions d'origine, jamais redessiné."],
+                  ["libre", "Logo facultatif", "L'IA alterne votre logo et un logotype typographique à partir du nom de la marque."],
+                ] as const).map(([k, label, hint]) => {
+                  const on = (brief.logoMode ?? "obligatoire") === k;
+                  return (
+                    <button type="button" role="radio" aria-checked={on} key={k} onClick={() => updateBrief({ logoMode: k })} className={`rounded-xl border p-3 text-left text-sm transition ${on ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100" : "border-ink-200 hover:border-brand-300"}`}>
+                      <b>{label}</b><span className="block text-xs text-ink-500">{hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </Q>
@@ -121,13 +150,29 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
               {brief.packshotColors?.length ? <div className="flex gap-1.5">{brief.packshotColors.map((c) => <span key={c} className="h-5 w-5 rounded-full border border-black/10" style={{ background: c }} title={c} />)}</div> : null}
             </div>
           </div>
+                  <div className="mt-4 border-t border-ink-100 pt-4">
+            <p className="mb-1 text-sm font-semibold">Photos de référence du produit fini <span className="font-normal text-ink-400">· jusqu'à 4</span></p>
+            <p className="mb-2 text-xs text-ink-500">Différents angles, la recette réelle, le produit hors emballage : l'IA s'en sert pour générer une photo fidèle à votre produit. Leurs couleurs complètent la palette.</p>
+            <ImageStrip images={brief.productRefs ?? []} max={4} label="Photo de référence" onChange={async (imgs) => {
+              updateBrief({ productRefs: imgs });
+              if (!brief.packshot && imgs.length) {
+                const colors = (await Promise.all(imgs.slice(0, 2).map((u) => dominantColors(u, 2)))).flat();
+                setSuggested((s) => [...new Set([...colors, ...s])].slice(0, 6));
+              }
+            }} />
+          </div>
         </Q>
 
-        <Q n={5} title="Positionnement">
+        <Q n={5} title="Charte graphique" hint="Optionnel · pour garder votre identité existante">
+          <CharterBlock brief={brief} updateBrief={updateBrief} />
+        </Q>
+
+        <Q n={6} title="Positionnement">
           <Chips options={POSITIONINGS} value={brief.positioning} onChange={(positioning) => updateBrief({ positioning })} />
         </Q>
 
-        <Q n={6} title="Couleurs souhaitées" hint="Jusqu'à 3 · laissez vide pour laisser l'IA choisir">
+        {brief.charter?.enabled && <p className="-mb-2 rounded-xl bg-brand-50 px-4 py-2 text-xs font-medium text-brand-800">Charte graphique active : vos couleurs et vos polices priment sur les deux questions suivantes (le style sert aux motifs et à la mise en scène).</p>}
+        <Q n={7} title="Couleurs souhaitées" hint="Jusqu'à 3 · laissez vide pour laisser l'IA choisir">
           <div className="flex flex-wrap items-center gap-2">
             {[...new Set([categoryDef(brief.category).color, ...suggested, ...SWATCHES])].map((c) => {
               const on = brief.colors.includes(c);
@@ -145,7 +190,7 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           {suggested.length > 0 && <p className="mt-2 text-xs text-ink-500">Les premières pastilles sont extraites de vos inspirations.</p>}
         </Q>
 
-        <Q n={7} title="Style graphique">
+        <Q n={8} title="Style graphique">
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {STYLES.map((s) => (
               <button type="button" key={s.key} onClick={() => updateBrief({ style: s.key })} className={`rounded-xl border p-3 text-left transition ${brief.style === s.key ? "border-brand-500 bg-brand-50 ring-2 ring-brand-100" : "border-ink-200 bg-white hover:border-brand-300"}`} aria-pressed={brief.style === s.key}>
@@ -159,41 +204,22 @@ export function StepBrief({ onGenerate }: { onGenerate: () => void }) {
           </div>
         </Q>
 
-        <Q n={8} title="Public cible">
+        <Q n={9} title="Public cible">
           <Chips options={AUDIENCES} value={brief.audience} onChange={(audience) => updateBrief({ audience })} />
         </Q>
 
-        <Q n={9} title="Pays de vente">
+        <Q n={10} title="Pays de vente">
           <select className="input" value={brief.country} onChange={(e) => updateBrief({ country: e.target.value })} aria-label="Pays de vente">
             {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </Q>
 
-        <Q n={10} title="Inspirations" hint="Optionnel · emballages, ambiances, moodboard">
-          <div className="flex flex-wrap gap-2">
-            {brief.inspirations.map((src, i) => (
-              <div key={i} className="group relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Inspiration ${i + 1}`} className="h-20 w-20 rounded-xl object-cover" />
-                <button type="button" onClick={() => updateBrief({ inspirations: brief.inspirations.filter((_, j) => j !== i) })} className="absolute -right-1.5 -top-1.5 hidden h-6 w-6 place-items-center rounded-full bg-ink-900 text-white group-hover:grid" aria-label="Retirer"><IconX size={12} /></button>
-              </div>
-            ))}
-            {brief.inspirations.length < 6 && (
-              <label className="grid h-20 w-20 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-ink-200 text-ink-400 hover:border-brand-300 hover:text-brand-600">
-                <IconImage />
-                <input type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
-                  const files = [...(e.target.files ?? [])].slice(0, 6 - brief.inspirations.length);
-                  const urls = await Promise.all(files.map((f) => fileToDataUrl(f, 700)));
-                  updateBrief({ inspirations: [...brief.inspirations, ...urls] });
-                  const colors = (await Promise.all(urls.map((u) => dominantColors(u, 3)))).flat();
-                  setSuggested((s) => [...new Set([...colors, ...s])].slice(0, 6));
-                }} />
-              </label>
-            )}
-          </div>
+        <Q n={11} title="Designs que vous aimez" hint="Optionnel · emballages, moodboard, votre ancien packaging">
+          <p className="mb-2 text-xs text-ink-500">L'application en extrait la palette et l'ambiance pour orienter les propositions ; l'IA s'en inspire pour la lumière et le style de la photo. Aucun texte ni logo n'est copié.</p>
+          <InspirationBlock brief={brief} updateBrief={updateBrief} />
         </Q>
 
-        <Q n={11} title="Contraintes" hint="Logo obligatoire, texte existant, mentions imposées…">
+        <Q n={12} title="Contraintes" hint="Logo obligatoire, texte existant, mentions imposées…">
           <textarea className="input min-h-[84px]" placeholder="ex. Logo obligatoire en haut à gauche, fond blanc, mention « Recette du chef »" value={brief.constraints} onChange={(e) => updateBrief({ constraints: e.target.value })} aria-label="Contraintes" />
         </Q>
 

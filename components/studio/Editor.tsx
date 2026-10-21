@@ -153,7 +153,11 @@ function EditorInner({ scene, dieline, report, onChange, onBack }: { scene: Desi
     commit({ ...scene, elements: [...scene.elements, full] });
     setSel(full.id);
   };
-  const remove = (id: string) => { commit({ ...scene, elements: scene.elements.filter((e) => e.id !== id) }); setSel(null); };
+  const remove = (id: string) => {
+    if (scene.elements.find((e) => e.id === id)?.mandatory) return; // logo officiel : non supprimable
+    commit({ ...scene, elements: scene.elements.filter((e) => e.id !== id) });
+    setSel(null);
+  };
   const reorder = (id: string, dir: 1 | -1) => {
     const els = [...scene.elements];
     const i = els.findIndex((e) => e.id === id);
@@ -320,7 +324,7 @@ function Properties({ el, scene, onPatch, onDelete, onReorder, onReplace, panelL
         </div>
         <button className="btn-ghost !p-1.5" onClick={() => onReorder(1)} title="Premier plan"><IconFront size={16} /></button>
         <button className="btn-ghost !p-1.5" onClick={() => onReorder(-1)} title="Arrière-plan"><IconFront size={16} className="rotate-180" /></button>
-        <button className="btn-ghost !p-1.5 text-rose-600" onClick={onDelete} title="Supprimer"><IconTrash size={16} /></button>
+        <button className="btn-ghost !p-1.5 text-rose-600 disabled:opacity-30" onClick={onDelete} disabled={el.mandatory} title={el.mandatory ? "Logo obligatoire : ne peut pas être supprimé" : "Supprimer"}><IconTrash size={16} /></button>
       </div>
 
       {el.kind === "text" && (
@@ -330,7 +334,7 @@ function Properties({ el, scene, onPatch, onDelete, onReorder, onReplace, panelL
             <label className="col-span-2 block">
               <span className="mb-1 block text-[11px] font-semibold text-ink-500">Police</span>
               <select className="input !py-1.5 text-xs" value={el.fontFamily} onChange={(e) => onPatch({ fontFamily: e.target.value } as Partial<TextElement>)} style={{ fontFamily: `"${el.fontFamily}"` }}>
-                {Object.keys(FONTS).map((f) => <option key={f} value={f} style={{ fontFamily: `"${f}"` }}>{f}</option>)}
+                {[...(scene.fontFaces ?? []).map((f) => f.family), ...Object.keys(FONTS)].map((f) => <option key={f} value={f} style={{ fontFamily: `"${f}"` }}>{f}</option>)}
               </select>
             </label>
             <Num label="Taille" value={el.fontSize / PT} step={1} suffix="pt" onChange={(v) => onPatch({ fontSize: Math.max(4, v) * PT } as Partial<TextElement>)} />
@@ -350,9 +354,10 @@ function Properties({ el, scene, onPatch, onDelete, onReorder, onReplace, panelL
         </>
       )}
 
-      {el.kind === "image" && (
+      {el.kind === "image" && !el.mandatory && (
         <button className="btn-secondary w-full" onClick={onReplace}><IconImage size={16} /> Remplacer la photo</button>
       )}
+      {el.mandatory && <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900"><IconLock size={12} /> Logo obligatoire fourni par la marque : déplaçable et redimensionnable sans déformation, jamais supprimé ni remplacé.</p>}
 
       {color !== undefined && (
         <div>

@@ -81,6 +81,31 @@ test("médicament : braille et DCI", () => {
   assert.ok(d.elements.some((e) => e.legalKey === "dci" && e.panelId === dieline.panels.find((p) => p.role === "front")!.id));
 });
 
+test("charte graphique : couleurs et polices imposées sur les 5 propositions", () => {
+  const dieline = analyzeDieline(buildTemplate(TEMPLATES[0]));
+  const charter = { enabled: true, primary: "#004b87", secondary: "#e6eef6", accent: "#ffb81c", background: "#ffffff", headingFont: "Ma Police", bodyFont: "Inter", customFonts: [{ family: "Ma Police", src: "data:font/ttf;base64,AAAA" }] };
+  const designs = generateDesigns(dieline, { ...brief, charter }, 5);
+  for (const d of designs) {
+    assert.equal(d.palette.primary, "#004b87");
+    assert.equal(d.palette.accent, "#ffb81c");
+    assert.equal(d.fonts.heading, "Ma Police");
+    assert.deepEqual(d.fontFaces?.map((f) => f.family), ["Ma Police"]);
+    const name = d.elements.find((e) => e.kind === "text" && e.role === "productName");
+    assert.ok(name && name.kind === "text" && name.fontFamily === "Ma Police");
+  }
+  assert.equal(new Set(designs.map((d) => d.layout)).size, 5, "la mise en page varie toujours");
+});
+
+test("inspirations sombres : propositions sur fond sombre", async () => {
+  const { luminance } = await import("../lib/color");
+  const dieline = analyzeDieline(buildTemplate(TEMPLATES[0]));
+  const b: Brief = { ...brief, colors: [], style: "minimaliste", inspirationProfile: { colors: ["#c9a227", "#1d2d50"], lightness: 0.2, saturation: 0.4, useColors: true } };
+  for (const d of generateDesigns(dieline, b, 3)) {
+    assert.ok(luminance(d.palette.background) < 0.2, `fond ${d.palette.background}`);
+    assert.ok([d.palette.primary, d.palette.accent].some((c) => ["#c9a227", "#1d2d50"].includes(c)), "palette issue des inspirations");
+  }
+});
+
 test("gamme complète cohérente", () => {
   const dieline = analyzeDieline(buildTemplate(TEMPLATES[2]));
   const [base] = generateDesigns(dieline, brief, 1);
@@ -104,4 +129,20 @@ test("couvercle solidaire du dos pivoté, dessous solidaire de la face non pivot
   const name = d.elements.find((e) => e.panelId === top.id && e.role === "productName")!;
   assert.equal(name.rotation, 180);
   assert.ok(d.elements.filter((e) => e.panelId === bottom.id && e.kind === "text").every((e) => e.rotation === 0));
+});
+
+test("logo obligatoire : présent partout, non déformé, contrôlé ; facultatif : alterné", () => {
+  const dieline = analyzeDieline(buildTemplate(TEMPLATES[0]));
+  const logo = "data:image/png;base64,LOGO";
+  const b: Brief = { ...brief, brandLogo: logo, brandLogoAspect: 3, logoMode: "obligatoire" };
+  for (const d of generateDesigns(dieline, b, 5)) {
+    const logos = d.elements.filter((e) => e.kind === "image" && e.src === logo);
+    assert.ok(logos.length >= 3, "face, dos, côté…");
+    assert.ok(logos.every((e) => e.mandatory && Math.abs(e.w / e.h - 3) < 0.01), "proportions d'origine");
+    const item = checkDesign(d, dieline, b).items.find((i) => i.id === "official-logo")!;
+    assert.equal(item.status, "ok", item.detail);
+  }
+  const libre = generateDesigns(dieline, { ...b, logoMode: "libre" }, 2);
+  assert.ok(libre[0].elements.some((e) => e.kind === "image" && e.src === logo));
+  assert.ok(!libre[1].elements.some((e) => e.kind === "image" && e.src === logo), "logotype typographique sur la 2e proposition");
 });

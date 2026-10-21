@@ -136,3 +136,38 @@ function rgbAt(px: Uint8ClampedArray, W: number, x: number, y: number): number[]
 function dist3(a: number[], b: number[]): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
+
+/** Analyse un lot de designs d'inspiration : couleurs dominantes communes et ambiance (luminosité, saturation). */
+export async function analyzeInspirations(srcs: string[]): Promise<{ colors: string[]; lightness: number; saturation: number }> {
+  const stats = await Promise.all(srcs.map((src) => new Promise<{ l: number; s: number }>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 40;
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, 40, 40);
+      const d = ctx.getImageData(0, 0, 40, 40).data;
+      let l = 0, sat = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
+        const [, hs, hl] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+        l += hl; sat += hs; n++;
+      }
+      resolve({ l: n ? l / n : 0.5, s: n ? sat / n : 0.3 });
+    };
+    img.onerror = () => resolve({ l: 0.5, s: 0.3 });
+    img.src = src;
+  })));
+  const colors = (await Promise.all(srcs.map((s) => dominantColors(s, 3)))).flat();
+  // Couleurs récurrentes en tête, puis dédoublonnage approximatif
+  const uniq: string[] = [];
+  for (const c of colors) if (!uniq.some((u) => colorGap(u, c) < 40)) uniq.push(c);
+  const n = Math.max(1, stats.length);
+  return { colors: uniq.slice(0, 4), lightness: stats.reduce((a, b) => a + b.l, 0) / n, saturation: stats.reduce((a, b) => a + b.s, 0) / n };
+}
+
+function colorGap(a: string, b: string): number {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+}

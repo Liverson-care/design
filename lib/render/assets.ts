@@ -22,8 +22,24 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 const loadedFonts = new Set<string>();
 
 /** Attend le chargement des polices de la scène avant de dessiner (sinon Konva mesure avec la police de repli). */
+const registered = new Set<string>();
+
+/** Enregistre les polices de la charte importées par l'utilisateur (FontFace) */
+async function registerFontFaces(scene: DesignScene) {
+  for (const f of scene.fontFaces ?? []) {
+    if (registered.has(f.family)) continue;
+    try {
+      const face = new FontFace(f.family, `url(${f.src})`);
+      await face.load();
+      document.fonts.add(face);
+      registered.add(f.family);
+    } catch { /* fichier de police illisible : police de repli */ }
+  }
+}
+
 export async function ensureFonts(scene: DesignScene): Promise<void> {
   if (typeof document === "undefined" || !document.fonts) return;
+  await registerFontFaces(scene);
   const wanted = new Set<string>();
   for (const el of scene.elements) {
     if (el.kind === "text") wanted.add(`${el.italic ? "italic " : ""}${el.fontWeight} 20px "${el.fontFamily}"`);

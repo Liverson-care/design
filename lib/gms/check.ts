@@ -96,6 +96,26 @@ export function checkDesign(scene: DesignScene, dieline: Dieline, brief: Brief):
     });
   }
 
+  // 2 bis. Logo officiel imposé par le client
+  if (brief.brandLogo && brief.logoMode !== "libre") {
+    const official = scene.elements.filter((e) => e.kind === "image" && e.src === brief.brandLogo);
+    const onFace = official.filter(onFront);
+    const ar = brief.brandLogoAspect;
+    const distorted = ar ? official.filter((e) => Math.abs(e.w / e.h - ar) > ar * 0.03) : [];
+    items.push({
+      id: "official-logo",
+      label: "Logo officiel",
+      status: !onFace.length ? "fail" : distorted.length ? "fail" : "ok",
+      detail: !onFace.length
+        ? "Le logo obligatoire est absent de la face avant."
+        : distorted.length
+          ? `${distorted.length} logo(s) déformé(s) : les proportions d'origine doivent être respectées.`
+          : `Logo officiel présent sur ${official.length} zone(s), dont la face avant, dans ses proportions d'origine.`,
+      advice: !onFace.length || distorted.length ? "Replacez le logo fourni sans le modifier." : undefined,
+      elementIds: distorted.map((e) => e.id),
+    });
+  }
+
   // 3. Contraste des couleurs
   const contrastIssues: { el: TextElement; ratio: number; min: number }[] = [];
   let onPhoto = 0;
